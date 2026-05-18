@@ -1,8 +1,33 @@
-// ===== FINPESSOAL - PARCELAMENTOS =====
+// ===== FINPESSOAL – PARCELAMENTOS JS =====
 
 let todosParcelamentos = [];
 let editandoId         = null;
 
+// ── Inicialização ─────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await new Promise(r => setTimeout(r, 180));
+  await popularSelectsParcelamentos();
+  await carregarParcelamentos();
+});
+
+// ── Popula o select de categoria via API (usa categorias de despesas) ──
+async function popularSelectsParcelamentos() {
+  const cats = _catsDespesas.length ? _catsDespesas : await buscarCatsDespesas();
+
+  const selCat = document.getElementById('parCategoria');
+  if (selCat) {
+    selCat.innerHTML = cats.length
+      ? cats.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('')
+      : '<option value="">Sem categorias</option>';
+  }
+}
+
+async function buscarCatsDespesas() {
+  const r = await apiGet('/configuracoes/categorias-despesas');
+  return r?.ok ? r.data : [];
+}
+
+// ── Listagem ──────────────────────────────────────────────────────
 async function carregarParcelamentos() {
   const resp = await apiGet('/parcelamentos');
   if (!resp || !resp.ok) return;
@@ -49,8 +74,8 @@ function renderParcelamentos(lista) {
         </div>
       </div>
       <div class="item-acoes" style="flex-direction:column">
-        <button class="btn-acao success" onclick="avancarParcela(${p.id})" title="Parcela paga">✅</button>
-        <button class="btn-acao"         onclick="abrirEdicao(${p.id})"    title="Editar">✏️</button>
+        <button class="btn-acao success" onclick="avancarParcela(${p.id})"      title="Parcela paga">✅</button>
+        <button class="btn-acao"         onclick="abrirEdicao(${p.id})"         title="Editar">✏️</button>
         <button class="btn-acao danger"  onclick="deletarParcelamento(${p.id})" title="Excluir">🗑️</button>
       </div>
     </div>`;
@@ -70,7 +95,7 @@ async function deletarParcelamento(id) {
   if (resp?.ok) carregarParcelamentos();
 }
 
-// ── Calculadora automática ─────────────────────────────────────────
+// ── Calculadora ───────────────────────────────────────────────────
 function calcularParcela() {
   const total = parseFloat(document.getElementById('parValorTotal').value);
   const num   = parseInt(document.getElementById('parTotalParcelas').value);
@@ -78,22 +103,23 @@ function calcularParcela() {
     document.getElementById('parValorParcela').value = (total / num).toFixed(2);
 }
 
-// ── Modal novo ─────────────────────────────────────────────────────
+// ── Modal novo ────────────────────────────────────────────────────
 function abrirModal() {
   editandoId = null;
-  document.getElementById('modalTitulo').textContent = 'Novo Parcelamento';
+  document.getElementById('modalTitulo').textContent  = 'Novo Parcelamento';
   document.getElementById('erroModal').classList.add('hidden');
-  document.getElementById('parDescricao').value    = '';
-  document.getElementById('parValorTotal').value   = '';
-  document.getElementById('parTotalParcelas').value = '';
-  document.getElementById('parValorParcela').value = '';
-  document.getElementById('parCategoria').value    = 'eletronicos';
+  document.getElementById('parDescricao').value      = '';
+  document.getElementById('parValorTotal').value     = '';
+  document.getElementById('parTotalParcelas').value  = '';
+  document.getElementById('parValorParcela').value   = '';
+  const sel = document.getElementById('parCategoria');
+  if (sel && sel.options.length) sel.selectedIndex = 0;
   const agora = new Date();
   preencherMesAno('parMesInicio', 'parAnoInicio', agora.getMonth() + 1, agora.getFullYear());
   document.getElementById('modalOverlay').classList.remove('hidden');
 }
 
-// ── Modal edição ───────────────────────────────────────────────────
+// ── Modal edição ──────────────────────────────────────────────────
 function abrirEdicao(id) {
   const p = todosParcelamentos.find(x => x.id === id);
   if (!p) return;
@@ -104,7 +130,8 @@ function abrirEdicao(id) {
   document.getElementById('parValorTotal').value    = p.valor_total;
   document.getElementById('parTotalParcelas').value = p.total_parcelas;
   document.getElementById('parValorParcela').value  = p.valor_parcela;
-  document.getElementById('parCategoria').value     = p.categoria;
+  const sel = document.getElementById('parCategoria');
+  if (sel) sel.value = p.categoria;
   preencherMesAno('parMesInicio', 'parAnoInicio', p.mes_inicio, p.ano_inicio);
   document.getElementById('modalOverlay').classList.remove('hidden');
 }
@@ -128,12 +155,14 @@ async function salvarParcelamento() {
 
   if (!descricao || isNaN(valor_parcela) || isNaN(total_parcelas)) {
     erroEl.textContent = 'Preencha todos os campos corretamente.';
-    erroEl.classList.remove('hidden');
-    return;
+    erroEl.classList.remove('hidden'); return;
   }
 
-  const corpo = { descricao, valor_total: isNaN(valor_total) ? valor_parcela * total_parcelas : valor_total,
-                  valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria };
+  const corpo = {
+    descricao,
+    valor_total: isNaN(valor_total) ? valor_parcela * total_parcelas : valor_total,
+    valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria
+  };
 
   const resp = editandoId
     ? await apiPut(`/parcelamentos/${editandoId}`, corpo)
@@ -141,12 +170,8 @@ async function salvarParcelamento() {
 
   if (!resp || !resp.ok) {
     erroEl.textContent = resp?.data?.erro || 'Erro ao salvar.';
-    erroEl.classList.remove('hidden');
-    return;
+    erroEl.classList.remove('hidden'); return;
   }
-
   fecharModal();
   carregarParcelamentos();
 }
-
-document.addEventListener('DOMContentLoaded', () => { setTimeout(carregarParcelamentos, 100); });

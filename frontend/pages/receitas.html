@@ -5,26 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FinPessoal – Receitas</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/style.css" />
 </head>
 <body>
+
+  <!-- ═══ SIDEBAR UNIFICADA ═══ -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="fp-logo">FP</div>
       <span>FinPessoal</span>
     </div>
     <nav class="sidebar-nav">
-      <a href="dashboard.html" class="nav-item">📊 Dashboard</a>
-      <a href="receitas.html"  class="nav-item active">💰 Receitas</a>
-      <a href="despesas.html"  class="nav-item">💳 Despesas</a>
+      <a href="dashboard.html"     class="nav-item">📊 Dashboard</a>
+      <a href="receitas.html"      class="nav-item active">💰 Receitas</a>
+      <a href="despesas.html"      class="nav-item">💳 Despesas</a>
       <a href="parcelamentos.html" class="nav-item">📅 Parcelamentos</a>
-      <a href="previsao.html"  class="nav-item">🔮 Previsões</a>
+      <a href="previsao.html"      class="nav-item">🔮 Previsões</a>
+      <a href="configuracoes.html" class="nav-item">⚙️ Configurações</a>
     </nav>
     <button class="btn-sair" onclick="sair()">🚪 Sair</button>
   </div>
   <div class="overlay" id="overlay" onclick="fecharMenu()"></div>
 
+  <!-- ═══ CONTEÚDO ═══ -->
   <div class="main-content">
     <header class="topbar">
       <button class="menu-toggle" onclick="toggleMenu()">☰</button>
@@ -50,7 +54,7 @@
 
       <div class="filtros-tipo">
         <button class="filtro-btn active" onclick="filtrarTipo('todos', this)">Todos</button>
-        <button class="filtro-btn" onclick="filtrarTipo('fixo', this)">Fixas</button>
+        <button class="filtro-btn" onclick="filtrarTipo('fixo',  this)">Fixas</button>
         <button class="filtro-btn" onclick="filtrarTipo('unico', this)">Únicos</button>
       </div>
 
@@ -58,10 +62,10 @@
         <p class="lista-vazia">Nenhuma receita cadastrada neste mês.</p>
       </div>
 
-      <!-- Receitas parceladas -->
+      <!-- Recebimentos Parcelados -->
       <div style="margin-top:28px">
         <div class="page-header">
-          <h2 style="font-size:17px;font-weight:700;color:var(--text-dark)">📈 Recebimentos Parcelados</h2>
+          <h2 style="font-size:17px;font-weight:700;color:var(--text)">📈 Recebimentos Parcelados</h2>
           <button class="btn-primario btn-sm" onclick="abrirModalParcelada()">+ Novo Parcelado</button>
         </div>
         <div id="listaReceitasParceladas" class="lista-itens">
@@ -71,7 +75,7 @@
     </div>
   </div>
 
-  <!-- MODAL RECEITA NORMAL (novo/edição) -->
+  <!-- ═══ MODAL RECEITA (novo / edição) ═══ -->
   <div class="modal-overlay hidden" id="modalOverlay">
     <div class="modal">
       <div class="modal-header">
@@ -79,6 +83,7 @@
         <button onclick="fecharModal()" class="btn-fechar">✕</button>
       </div>
       <div id="erroModal" class="alerta alerta-erro hidden"></div>
+
       <div class="campo">
         <label>Tipo de receita</label>
         <select id="recTipo">
@@ -96,15 +101,8 @@
       </div>
       <div class="campo">
         <label>Categoria / Origem</label>
-        <select id="recCategoria">
-          <option value="salario">Salário</option>
-          <option value="freela">Freelance / Bico</option>
-          <option value="aluguel">Aluguel recebido</option>
-          <option value="investimento">Investimentos</option>
-          <option value="pensao">Pensão / Benefício</option>
-          <option value="presente">Presente / Doação</option>
-          <option value="outros">Outros</option>
-        </select>
+        <!-- preenchido dinamicamente pela API -->
+        <select id="recCategoria"><option value="">Carregando...</option></select>
       </div>
       <div class="campo-linha">
         <div class="campo">
@@ -120,7 +118,7 @@
     </div>
   </div>
 
-  <!-- MODAL RECEITA PARCELADA (novo/edição) -->
+  <!-- ═══ MODAL RECEITA PARCELADA (novo / edição) ═══ -->
   <div class="modal-overlay hidden" id="modalParceladaOverlay">
     <div class="modal">
       <div class="modal-header">
@@ -128,6 +126,7 @@
         <button onclick="fecharModalParcelada()" class="btn-fechar">✕</button>
       </div>
       <div id="erroModalParcelada" class="alerta alerta-erro hidden"></div>
+
       <div class="campo">
         <label>Descrição</label>
         <input type="text" id="rpDescricao" placeholder="Ex: Venda do notebook, Acordo parcelado..." />
@@ -148,12 +147,8 @@
       </div>
       <div class="campo">
         <label>Categoria</label>
-        <select id="rpCategoria">
-          <option value="venda">Venda</option>
-          <option value="acordo">Acordo / Parcelamento</option>
-          <option value="investimento">Investimento</option>
-          <option value="outros">Outros</option>
-        </select>
+        <!-- preenchido dinamicamente pela API -->
+        <select id="rpCategoria"><option value="">Carregando...</option></select>
       </div>
       <div class="campo-linha">
         <div class="campo">

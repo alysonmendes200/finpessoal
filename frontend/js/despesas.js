@@ -1,9 +1,64 @@
-// ===== FINPESSOAL - DESPESAS =====
+// ===== FINPESSOAL – DESPESAS JS =====
 
 let todasDespesas = [];
 let filtroAtivo   = 'todos';
-let editandoId    = null; // null = novo, número = editando
+let editandoId    = null;
 
+// ── Inicialização ─────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await new Promise(r => setTimeout(r, 180));
+  await popularSelectsDespesas();
+  await carregarDespesas();
+});
+
+// ── Popula categorias e tipos via API ─────────────────────────────
+async function popularSelectsDespesas() {
+  const [cats, tipos] = await Promise.all([
+    buscarCatsDespesas(),
+    buscarTiposDespesas()
+  ]);
+
+  // Select de categoria do modal
+  const selCat = document.getElementById('despCategoria');
+  if (selCat) {
+    selCat.innerHTML = cats.length
+      ? cats.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('')
+      : '<option value="">Sem categorias</option>';
+  }
+
+  // Select de tipo do modal
+  const selTipo = document.getElementById('despTipo');
+  if (selTipo) {
+    selTipo.innerHTML = tipos.length
+      ? tipos.map(t => `<option value="${t.codigo}">${t.nome}</option>`).join('')
+      : '<option value="">Sem tipos</option>';
+  }
+
+  // Botões de filtro dinâmicos (mantém "Todos" + um por tipo)
+  const filtrosEl = document.getElementById('filtrosTipo');
+  if (filtrosEl && tipos.length) {
+    const botoesTipos = tipos.map(t =>
+      `<button class="filtro-btn" onclick="filtrarTipo('${t.codigo}', this)">${t.nome}</button>`
+    ).join('');
+    filtrosEl.innerHTML =
+      `<button class="filtro-btn active" onclick="filtrarTipo('todos', this)">Todos</button>` +
+      botoesTipos;
+  }
+}
+
+async function buscarCatsDespesas() {
+  if (_catsDespesas.length) return _catsDespesas;
+  const r = await apiGet('/configuracoes/categorias-despesas');
+  return r?.ok ? r.data : [];
+}
+
+async function buscarTiposDespesas() {
+  if (_tiposDespesas.length) return _tiposDespesas;
+  const r = await apiGet('/configuracoes/tipos-despesas');
+  return r?.ok ? r.data : [];
+}
+
+// ── Listagem ──────────────────────────────────────────────────────
 async function carregarDespesas() {
   const mes = getMesSelecionado();
   const ano = getAnoSelecionado();
@@ -26,21 +81,23 @@ function filtrarTipo(tipo, btn) {
   renderDespesas(lista);
 }
 
-const LABEL_TIPO = { fixo: 'Fixa', variavel: 'Variável', fatura: 'Fatura' };
-
 function renderDespesas(lista) {
   const el = document.getElementById('listaDespesas');
   if (!lista || lista.length === 0) {
     el.innerHTML = '<p class="lista-vazia">Nenhuma despesa encontrada.</p>';
     return;
   }
-  el.innerHTML = lista.map(d => `
+
+  el.innerHTML = lista.map(d => {
+    // Label do tipo: busca nos tipos dinâmicos, usa o código como fallback
+    const tipoLabel = _tiposDespesas.find(t => t.codigo === d.tipo)?.nome || d.tipo;
+    return `
     <div class="item-card ${d.pago ? 'pago' : ''}">
       <div class="item-emoji">${emojiCat(d.categoria)}</div>
       <div class="item-info">
         <div class="item-desc">
           ${d.descricao}
-          <span class="badge badge-${d.tipo}">${LABEL_TIPO[d.tipo] || d.tipo}</span>
+          <span class="badge badge-${d.tipo}">${tipoLabel}</span>
           ${d.pago ? '<span class="badge" style="background:#d1fae5;color:#059669">Pago</span>' : ''}
         </div>
         <div class="item-sub">${d.categoria} • ${MESES[d.mes - 1]} ${d.ano}</div>
@@ -52,10 +109,11 @@ function renderDespesas(lista) {
                 title="${d.pago ? 'Desfazer pagamento' : 'Marcar como pago'}">
           ${d.pago ? '↩️' : '✅'}
         </button>
-        <button class="btn-acao" onclick="abrirEdicao(${d.id})" title="Editar">✏️</button>
-        <button class="btn-acao danger" onclick="deletarDespesa(${d.id})" title="Excluir">🗑️</button>
+        <button class="btn-acao"        onclick="abrirEdicao(${d.id})"     title="Editar">✏️</button>
+        <button class="btn-acao danger" onclick="deletarDespesa(${d.id})"  title="Excluir">🗑️</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 async function togglePago(id, pago) {
@@ -76,8 +134,11 @@ function abrirModal() {
   document.getElementById('erroModal').classList.add('hidden');
   document.getElementById('despDescricao').value = '';
   document.getElementById('despValor').value     = '';
-  document.getElementById('despCategoria').value = 'moradia';
-  document.getElementById('despTipo').value      = 'fixo';
+  // Seleciona primeiro item dos selects dinâmicos
+  const selCat  = document.getElementById('despCategoria');
+  const selTipo = document.getElementById('despTipo');
+  if (selCat  && selCat.options.length)  selCat.selectedIndex  = 0;
+  if (selTipo && selTipo.options.length) selTipo.selectedIndex = 0;
   preencherMesAno('despMes', 'despAno', getMesSelecionado(), getAnoSelecionado());
   document.getElementById('modalOverlay').classList.remove('hidden');
 }
@@ -91,8 +152,10 @@ function abrirEdicao(id) {
   document.getElementById('erroModal').classList.add('hidden');
   document.getElementById('despDescricao').value = d.descricao;
   document.getElementById('despValor').value     = d.valor;
-  document.getElementById('despCategoria').value = d.categoria;
-  document.getElementById('despTipo').value      = d.tipo;
+  const selCat  = document.getElementById('despCategoria');
+  const selTipo = document.getElementById('despTipo');
+  if (selCat)  selCat.value  = d.categoria;
+  if (selTipo) selTipo.value = d.tipo;
   preencherMesAno('despMes', 'despAno', d.mes, d.ano);
   document.getElementById('modalOverlay').classList.remove('hidden');
 }
@@ -115,8 +178,11 @@ async function salvarDespesa() {
 
   if (!descricao || isNaN(valor) || valor <= 0) {
     erroEl.textContent = 'Preencha a descrição e um valor válido.';
-    erroEl.classList.remove('hidden');
-    return;
+    erroEl.classList.remove('hidden'); return;
+  }
+  if (!categoria || !tipo) {
+    erroEl.textContent = 'Selecione categoria e tipo.';
+    erroEl.classList.remove('hidden'); return;
   }
 
   const corpo = { descricao, valor, categoria, tipo, mes, ano };
@@ -126,12 +192,8 @@ async function salvarDespesa() {
 
   if (!resp || !resp.ok) {
     erroEl.textContent = resp?.data?.erro || 'Erro ao salvar.';
-    erroEl.classList.remove('hidden');
-    return;
+    erroEl.classList.remove('hidden'); return;
   }
-
   fecharModal();
   carregarDespesas();
 }
-
-document.addEventListener('DOMContentLoaded', () => { setTimeout(carregarDespesas, 100); });

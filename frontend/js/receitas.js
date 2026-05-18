@@ -1,9 +1,40 @@
-// ===== FINPESSOAL - RECEITAS =====
+// ===== FINPESSOAL – RECEITAS JS =====
 
-let todasReceitas = [];
-let filtroAtivo   = 'todos';
-let editandoId    = null;
+let todasReceitas       = [];
+let todasParceladas     = [];
+let filtroAtivo         = 'todos';
+let editandoId          = null;
+let editandoParceladaId = null;
 
+// ── Inicialização ─────────────────────────────────────────────────
+// app.js já chama carregarConfiguracoes() no DOMContentLoaded.
+// Esperamos as configurações estarem prontas antes de carregar dados.
+document.addEventListener('DOMContentLoaded', async () => {
+  // aguarda app.js terminar (verificarAuth + carregarConfiguracoes)
+  await new Promise(r => setTimeout(r, 180));
+  await popularSelectsReceitas();
+  await carregarReceitas();
+});
+
+// ── Popula os selects de categoria com dados da API ───────────────
+async function popularSelectsReceitas() {
+  // _catsReceitas é carregado pelo app.js via carregarConfiguracoes()
+  const cats = _catsReceitas.length ? _catsReceitas : await buscarCatsReceitas();
+
+  const opts = cats.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('');
+
+  const selRec = document.getElementById('recCategoria');
+  const selRp  = document.getElementById('rpCategoria');
+  if (selRec) selRec.innerHTML = opts || '<option value="">Sem categorias</option>';
+  if (selRp)  selRp.innerHTML  = opts || '<option value="">Sem categorias</option>';
+}
+
+async function buscarCatsReceitas() {
+  const r = await apiGet('/configuracoes/categorias-receitas');
+  return r?.ok ? r.data : [];
+}
+
+// ── Listagem ──────────────────────────────────────────────────────
 async function carregarReceitas() {
   const mes = getMesSelecionado();
   const ano = getAnoSelecionado();
@@ -17,7 +48,7 @@ async function carregarReceitas() {
   const total = todasReceitas.reduce((s, r) => s + parseFloat(r.valor), 0);
   document.getElementById('totalMes').textContent = formatarMoeda(total);
 
-  carregarParceladas();
+  await carregarParceladas();
 }
 
 function filtrarTipo(tipo, btn) {
@@ -46,7 +77,7 @@ function renderReceitas(lista) {
       </div>
       <div class="item-valor" style="color:var(--green)">${formatarMoeda(r.valor)}</div>
       <div class="item-acoes">
-        <button class="btn-acao"        onclick="abrirEdicao(${r.id})" title="Editar">✏️</button>
+        <button class="btn-acao"        onclick="abrirEdicao(${r.id})"    title="Editar">✏️</button>
         <button class="btn-acao danger" onclick="deletarReceita(${r.id})" title="Excluir">🗑️</button>
       </div>
     </div>`).join('');
@@ -66,7 +97,9 @@ function abrirModal() {
   document.getElementById('recTipo').value      = 'unico';
   document.getElementById('recDescricao').value = '';
   document.getElementById('recValor').value     = '';
-  document.getElementById('recCategoria').value = 'salario';
+  // Seleciona primeiro item da lista dinâmica
+  const sel = document.getElementById('recCategoria');
+  if (sel && sel.options.length) sel.selectedIndex = 0;
   preencherMesAno('recMes', 'recAno', getMesSelecionado(), getAnoSelecionado());
   document.getElementById('modalOverlay').classList.remove('hidden');
 }
@@ -81,7 +114,9 @@ function abrirEdicao(id) {
   document.getElementById('recTipo').value      = r.tipo;
   document.getElementById('recDescricao').value = r.descricao;
   document.getElementById('recValor').value     = r.valor;
-  document.getElementById('recCategoria').value = r.categoria;
+  // Tenta selecionar o valor salvo; se não existir na lista dinâmica, mantém o primeiro
+  const sel = document.getElementById('recCategoria');
+  if (sel) sel.value = r.categoria;
   preencherMesAno('recMes', 'recAno', r.mes, r.ano);
   document.getElementById('modalOverlay').classList.remove('hidden');
 }
@@ -104,8 +139,11 @@ async function salvarReceita() {
 
   if (!descricao || isNaN(valor) || valor <= 0) {
     erroEl.textContent = 'Preencha a descrição e um valor válido.';
-    erroEl.classList.remove('hidden');
-    return;
+    erroEl.classList.remove('hidden'); return;
+  }
+  if (!categoria) {
+    erroEl.textContent = 'Selecione uma categoria.';
+    erroEl.classList.remove('hidden'); return;
   }
 
   const corpo = { descricao, valor, categoria, tipo, mes, ano };
@@ -115,18 +153,13 @@ async function salvarReceita() {
 
   if (!resp || !resp.ok) {
     erroEl.textContent = resp?.data?.erro || 'Erro ao salvar.';
-    erroEl.classList.remove('hidden');
-    return;
+    erroEl.classList.remove('hidden'); return;
   }
-
   fecharModal();
   carregarReceitas();
 }
 
-// ── Receitas Parceladas ───────────────────────────────────────────
-
-let todasParceladas = [];
-let editandoParceladaId = null;
+// ═══ RECEITAS PARCELADAS ══════════════════════════════════════════
 
 async function carregarParceladas() {
   const resp = await apiGet('/receitas/parceladas');
@@ -162,12 +195,14 @@ function renderParceladas(lista) {
           ${formatarMoeda(p.valor_parcela)}
           <span style="font-size:11px;color:var(--text-muted)">/mês</span>
         </div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Total: ${formatarMoeda(p.valor_total)}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+          Total: ${formatarMoeda(p.valor_total)}
+        </div>
       </div>
       <div class="item-acoes" style="flex-direction:column">
-        <button class="btn-acao success" onclick="avancarParcelada(${p.id})" title="Parcela recebida">✅</button>
-        <button class="btn-acao"         onclick="abrirEdicaoParcelada(${p.id})" title="Editar">✏️</button>
-        <button class="btn-acao danger"  onclick="deletarParcelada(${p.id})" title="Excluir">🗑️</button>
+        <button class="btn-acao success" onclick="avancarParcelada(${p.id})"      title="Parcela recebida">✅</button>
+        <button class="btn-acao"         onclick="abrirEdicaoParcelada(${p.id})"  title="Editar">✏️</button>
+        <button class="btn-acao danger"  onclick="deletarParcelada(${p.id})"      title="Excluir">🗑️</button>
       </div>
     </div>`;
   }).join('');
@@ -190,11 +225,12 @@ function abrirModalParcelada() {
   editandoParceladaId = null;
   document.getElementById('modalParceladaTitulo').textContent = 'Novo Recebimento Parcelado';
   document.getElementById('erroModalParcelada').classList.add('hidden');
-  document.getElementById('rpDescricao').value    = '';
-  document.getElementById('rpValorTotal').value   = '';
+  document.getElementById('rpDescricao').value     = '';
+  document.getElementById('rpValorTotal').value    = '';
   document.getElementById('rpTotalParcelas').value = '';
-  document.getElementById('rpValorParcela').value = '';
-  document.getElementById('rpCategoria').value    = 'venda';
+  document.getElementById('rpValorParcela').value  = '';
+  const sel = document.getElementById('rpCategoria');
+  if (sel && sel.options.length) sel.selectedIndex = 0;
   const agora = new Date();
   preencherMesAno('rpMesInicio', 'rpAnoInicio', agora.getMonth() + 1, agora.getFullYear());
   document.getElementById('modalParceladaOverlay').classList.remove('hidden');
@@ -210,7 +246,8 @@ function abrirEdicaoParcelada(id) {
   document.getElementById('rpValorTotal').value    = p.valor_total;
   document.getElementById('rpTotalParcelas').value = p.total_parcelas;
   document.getElementById('rpValorParcela').value  = p.valor_parcela;
-  document.getElementById('rpCategoria').value     = p.categoria;
+  const sel = document.getElementById('rpCategoria');
+  if (sel) sel.value = p.categoria;
   preencherMesAno('rpMesInicio', 'rpAnoInicio', p.mes_inicio, p.ano_inicio);
   document.getElementById('modalParceladaOverlay').classList.remove('hidden');
 }
@@ -241,8 +278,7 @@ async function salvarReceitaParcelada() {
 
   if (!descricao || isNaN(valor_parcela) || isNaN(total_parcelas)) {
     erroEl.textContent = 'Preencha todos os campos corretamente.';
-    erroEl.classList.remove('hidden');
-    return;
+    erroEl.classList.remove('hidden'); return;
   }
 
   const corpo = {
@@ -257,12 +293,8 @@ async function salvarReceitaParcelada() {
 
   if (!resp || !resp.ok) {
     erroEl.textContent = resp?.data?.erro || 'Erro ao salvar.';
-    erroEl.classList.remove('hidden');
-    return;
+    erroEl.classList.remove('hidden'); return;
   }
-
   fecharModalParcelada();
   carregarReceitas();
 }
-
-document.addEventListener('DOMContentLoaded', () => { setTimeout(carregarReceitas, 100); });

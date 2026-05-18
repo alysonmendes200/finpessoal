@@ -5,26 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FinPessoal – Despesas</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/style.css" />
 </head>
 <body>
+
+  <!-- ═══ SIDEBAR UNIFICADA ═══ -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="fp-logo">FP</div>
       <span>FinPessoal</span>
     </div>
     <nav class="sidebar-nav">
-      <a href="dashboard.html" class="nav-item">📊 Dashboard</a>
-      <a href="receitas.html"  class="nav-item">💰 Receitas</a>
-      <a href="despesas.html"  class="nav-item active">💳 Despesas</a>
+      <a href="dashboard.html"     class="nav-item">📊 Dashboard</a>
+      <a href="receitas.html"      class="nav-item">💰 Receitas</a>
+      <a href="despesas.html"      class="nav-item active">💳 Despesas</a>
       <a href="parcelamentos.html" class="nav-item">📅 Parcelamentos</a>
-      <a href="previsao.html"  class="nav-item">🔮 Previsões</a>
+      <a href="previsao.html"      class="nav-item">🔮 Previsões</a>
+      <a href="configuracoes.html" class="nav-item">⚙️ Configurações</a>
     </nav>
     <button class="btn-sair" onclick="sair()">🚪 Sair</button>
   </div>
   <div class="overlay" id="overlay" onclick="fecharMenu()"></div>
 
+  <!-- ═══ CONTEÚDO ═══ -->
   <div class="main-content">
     <header class="topbar">
       <button class="menu-toggle" onclick="toggleMenu()">☰</button>
@@ -48,11 +52,9 @@
         <strong id="totalMes" class="valor-negativo">R$ 0,00</strong>
       </div>
 
-      <div class="filtros-tipo">
+      <!-- filtros dinâmicos (gerados pelo JS após carregar tipos da API) -->
+      <div class="filtros-tipo" id="filtrosTipo">
         <button class="filtro-btn active" onclick="filtrarTipo('todos', this)">Todos</button>
-        <button class="filtro-btn" onclick="filtrarTipo('fixo', this)">Fixas</button>
-        <button class="filtro-btn" onclick="filtrarTipo('variavel', this)">Variáveis</button>
-        <button class="filtro-btn" onclick="filtrarTipo('fatura', this)">Faturas</button>
       </div>
 
       <div id="listaDespesas" class="lista-itens">
@@ -61,7 +63,7 @@
     </div>
   </div>
 
-  <!-- MODAL NOVO / EDIÇÃO -->
+  <!-- ═══ MODAL DESPESA (novo / edição) ═══ -->
   <div class="modal-overlay hidden" id="modalOverlay">
     <div class="modal">
       <div class="modal-header">
@@ -81,26 +83,13 @@
       <div class="campo-linha">
         <div class="campo">
           <label>Categoria</label>
-          <select id="despCategoria">
-            <option value="moradia">Moradia</option>
-            <option value="alimentacao">Alimentação</option>
-            <option value="transporte">Transporte</option>
-            <option value="saude">Saúde</option>
-            <option value="educacao">Educação</option>
-            <option value="lazer">Lazer</option>
-            <option value="assinaturas">Assinaturas</option>
-            <option value="fatura">Fatura Cartão</option>
-            <option value="servicos">Serviços</option>
-            <option value="outros">Outros</option>
-          </select>
+          <!-- preenchido dinamicamente pela API -->
+          <select id="despCategoria"><option value="">Carregando...</option></select>
         </div>
         <div class="campo">
           <label>Tipo</label>
-          <select id="despTipo">
-            <option value="fixo">Fixa (recorrente)</option>
-            <option value="variavel">Variável</option>
-            <option value="fatura">Fatura</option>
-          </select>
+          <!-- preenchido dinamicamente pela API -->
+          <select id="despTipo"><option value="">Carregando...</option></select>
         </div>
       </div>
       <div class="campo-linha">
