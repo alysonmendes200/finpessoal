@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FinPessoal – Despesas</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/style.css" />
 </head>
 <body>
@@ -18,10 +18,10 @@
       <a href="receitas.html" class="nav-item">💰 Receitas</a>
       <a href="despesas.html" class="nav-item active">💳 Despesas</a>
       <a href="parcelamentos.html" class="nav-item">📅 Parcelamentos</a>
+      <a href="previsao.html" class="nav-item">🔮 Previsões</a>
     </nav>
     <button class="btn-sair" onclick="sair()">🚪 Sair</button>
   </div>
-
   <div class="overlay" id="overlay" onclick="fecharMenu()"></div>
 
   <div class="main-content">
@@ -68,7 +68,6 @@
         <button onclick="fecharModal()" class="btn-fechar">✕</button>
       </div>
       <div id="erroModal" class="alerta alerta-erro hidden"></div>
-
       <div class="campo">
         <label>Descrição</label>
         <input type="text" id="despDescricao" placeholder="Ex: Aluguel, Mercado, Netflix..." />
@@ -96,7 +95,7 @@
         <div class="campo">
           <label>Tipo</label>
           <select id="despTipo">
-            <option value="fixo">Fixa</option>
+            <option value="fixo">Fixa (recorrente)</option>
             <option value="variavel">Variável</option>
             <option value="fatura">Fatura</option>
           </select>

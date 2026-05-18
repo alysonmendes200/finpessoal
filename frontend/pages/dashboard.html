@@ -5,39 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FinPessoal – Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-  <!-- SIDEBAR -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <span class="brand-icon-sm">₿</span>
-      <span>FinPessoal</span>
+      <span class="brand-icon-sm">₿</span><span>FinPessoal</span>
     </div>
     <nav class="sidebar-nav">
-      <a href="dashboard.html" class="nav-item active">
-        <span class="nav-icon">📊</span><span>Dashboard</span>
-      </a>
-      <a href="receitas.html" class="nav-item">
-        <span class="nav-icon">💰</span><span>Receitas</span>
-      </a>
-      <a href="despesas.html" class="nav-item">
-        <span class="nav-icon">💳</span><span>Despesas</span>
-      </a>
-      <a href="parcelamentos.html" class="nav-item">
-        <span class="nav-icon">📅</span><span>Parcelamentos</span>
-      </a>
+      <a href="dashboard.html" class="nav-item active">📊 Dashboard</a>
+      <a href="receitas.html" class="nav-item">💰 Receitas</a>
+      <a href="despesas.html" class="nav-item">💳 Despesas</a>
+      <a href="parcelamentos.html" class="nav-item">📅 Parcelamentos</a>
+      <a href="previsao.html" class="nav-item">🔮 Previsões</a>
     </nav>
     <button class="btn-sair" onclick="sair()">🚪 Sair</button>
   </div>
-
-  <!-- OVERLAY MOBILE -->
   <div class="overlay" id="overlay" onclick="fecharMenu()"></div>
 
-  <!-- CONTEÚDO PRINCIPAL -->
   <div class="main-content">
     <header class="topbar">
       <button class="menu-toggle" onclick="toggleMenu()">☰</button>
@@ -53,7 +41,6 @@
     <div class="page-content">
       <h1 class="page-title">Dashboard</h1>
 
-      <!-- CARDS RESUMO -->
       <div class="cards-grid">
         <div class="card card-receita">
           <div class="card-label">Total Receitas</div>
@@ -77,7 +64,6 @@
         </div>
       </div>
 
-      <!-- GRÁFICOS -->
       <div class="graficos-grid">
         <div class="grafico-box">
           <h3>Onde está indo seu dinheiro</h3>
@@ -86,7 +72,6 @@
           </div>
           <div id="legendaCategorias" class="legenda-custom"></div>
         </div>
-
         <div class="grafico-box">
           <h3>Receitas vs Gastos – <span id="anoGrafico"></span></h3>
           <div class="grafico-wrapper">
@@ -95,7 +80,6 @@
         </div>
       </div>
 
-      <!-- BARRA DE PROGRESSO -->
       <div class="progresso-box">
         <h3>Comprometimento da renda</h3>
         <div class="progresso-info">
