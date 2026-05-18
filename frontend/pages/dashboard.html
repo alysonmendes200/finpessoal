@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinPessoal – Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon-sm">₿</span>
+      <span>FinPessoal</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="nav-item active">
+        <span class="nav-icon">📊</span><span>Dashboard</span>
+      </a>
+      <a href="receitas.html" class="nav-item">
+        <span class="nav-icon">💰</span><span>Receitas</span>
+      </a>
+      <a href="despesas.html" class="nav-item">
+        <span class="nav-icon">💳</span><span>Despesas</span>
+      </a>
+      <a href="parcelamentos.html" class="nav-item">
+        <span class="nav-icon">📅</span><span>Parcelamentos</span>
+      </a>
+    </nav>
+    <button class="btn-sair" onclick="sair()">🚪 Sair</button>
+  </div>
+
+  <!-- OVERLAY MOBILE -->
+  <div class="overlay" id="overlay" onclick="fecharMenu()"></div>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <div class="main-content">
+    <header class="topbar">
+      <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+      <div class="topbar-info">
+        <span id="saudacao">Olá!</span>
+        <div class="mes-selector">
+          <select id="selMes" onchange="carregarDados()"></select>
+          <select id="selAno" onchange="carregarDados()"></select>
+        </div>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <h1 class="page-title">Dashboard</h1>
+
+      <!-- CARDS RESUMO -->
+      <div class="cards-grid">
+        <div class="card card-receita">
+          <div class="card-label">Total Receitas</div>
+          <div class="card-valor" id="totalReceitas">R$ 0,00</div>
+          <div class="card-icon">💰</div>
+        </div>
+        <div class="card card-despesa">
+          <div class="card-label">Total Gastos</div>
+          <div class="card-valor" id="totalGastos">R$ 0,00</div>
+          <div class="card-icon">💸</div>
+        </div>
+        <div class="card card-parcela">
+          <div class="card-label">Parcelas do Mês</div>
+          <div class="card-valor" id="totalParcelas">R$ 0,00</div>
+          <div class="card-icon">📅</div>
+        </div>
+        <div class="card card-saldo" id="cardSaldo">
+          <div class="card-label">Saldo</div>
+          <div class="card-valor" id="saldo">R$ 0,00</div>
+          <div class="card-icon">⚖️</div>
+        </div>
+      </div>
+
+      <!-- GRÁFICOS -->
+      <div class="graficos-grid">
+        <div class="grafico-box">
+          <h3>Onde está indo seu dinheiro</h3>
+          <div class="grafico-wrapper">
+            <canvas id="graficoCategorias"></canvas>
+          </div>
+          <div id="legendaCategorias" class="legenda-custom"></div>
+        </div>
+
+        <div class="grafico-box">
+          <h3>Receitas vs Gastos – <span id="anoGrafico"></span></h3>
+          <div class="grafico-wrapper">
+            <canvas id="graficoAnual"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- BARRA DE PROGRESSO -->
+      <div class="progresso-box">
+        <h3>Comprometimento da renda</h3>
+        <div class="progresso-info">
+          <span id="progressoTexto">0% comprometido</span>
+          <span id="progressoValores"></span>
+        </div>
+        <div class="barra-progresso">
+          <div class="barra-fill" id="barraFill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/app.js"></script>
+  <script src="../js/dashboard.js"></script>
+</body>
+</html>
