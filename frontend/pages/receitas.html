@@ -11,14 +11,15 @@
 <body>
   <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <span class="brand-icon-sm">₿</span><span>FinPessoal</span>
+      <div class="fp-logo">FP</div>
+      <span>FinPessoal</span>
     </div>
     <nav class="sidebar-nav">
       <a href="dashboard.html" class="nav-item">📊 Dashboard</a>
-      <a href="receitas.html" class="nav-item active">💰 Receitas</a>
-      <a href="despesas.html" class="nav-item">💳 Despesas</a>
+      <a href="receitas.html"  class="nav-item active">💰 Receitas</a>
+      <a href="despesas.html"  class="nav-item">💳 Despesas</a>
       <a href="parcelamentos.html" class="nav-item">📅 Parcelamentos</a>
-      <a href="previsao.html" class="nav-item">🔮 Previsões</a>
+      <a href="previsao.html"  class="nav-item">🔮 Previsões</a>
     </nav>
     <button class="btn-sair" onclick="sair()">🚪 Sair</button>
   </div>
@@ -70,11 +71,11 @@
     </div>
   </div>
 
-  <!-- MODAL RECEITA NORMAL -->
+  <!-- MODAL RECEITA NORMAL (novo/edição) -->
   <div class="modal-overlay hidden" id="modalOverlay">
     <div class="modal">
       <div class="modal-header">
-        <h3>Nova Receita</h3>
+        <h3 id="modalTitulo">Nova Receita</h3>
         <button onclick="fecharModal()" class="btn-fechar">✕</button>
       </div>
       <div id="erroModal" class="alerta alerta-erro hidden"></div>
@@ -82,7 +83,7 @@
         <label>Tipo de receita</label>
         <select id="recTipo">
           <option value="unico">Único (recebimento pontual)</option>
-          <option value="fixo">Fixo (repete todo mês nas previsões)</option>
+          <option value="fixo">Fixo (projeta automaticamente todo mês)</option>
         </select>
       </div>
       <div class="campo">
@@ -115,15 +116,15 @@
           <select id="recAno"></select>
         </div>
       </div>
-      <button class="btn-primario" onclick="salvarReceita()">Salvar Receita</button>
+      <button class="btn-primario" onclick="salvarReceita()">Salvar</button>
     </div>
   </div>
 
-  <!-- MODAL RECEITA PARCELADA -->
+  <!-- MODAL RECEITA PARCELADA (novo/edição) -->
   <div class="modal-overlay hidden" id="modalParceladaOverlay">
     <div class="modal">
       <div class="modal-header">
-        <h3>Novo Recebimento Parcelado</h3>
+        <h3 id="modalParceladaTitulo">Novo Recebimento Parcelado</h3>
         <button onclick="fecharModalParcelada()" class="btn-fechar">✕</button>
       </div>
       <div id="erroModalParcelada" class="alerta alerta-erro hidden"></div>

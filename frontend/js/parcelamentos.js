@@ -1,26 +1,28 @@
 // ===== FINPESSOAL - PARCELAMENTOS =====
 
+let todosParcelamentos = [];
+let editandoId         = null;
+
 async function carregarParcelamentos() {
   const resp = await apiGet('/parcelamentos');
   if (!resp || !resp.ok) return;
 
-  const lista = resp.data;
-  renderParcelamentos(lista);
+  todosParcelamentos = resp.data;
+  renderParcelamentos(todosParcelamentos);
 
-  const total = lista.reduce((s, p) => s + parseFloat(p.valor_parcela), 0);
+  const total = todosParcelamentos.reduce((s, p) => s + parseFloat(p.valor_parcela), 0);
   document.getElementById('totalParcelas').textContent = formatarMoeda(total);
 }
 
 function renderParcelamentos(lista) {
   const el = document.getElementById('listaParcelamentos');
-
   if (!lista || lista.length === 0) {
     el.innerHTML = '<p class="lista-vazia">Nenhum parcelamento ativo.</p>';
     return;
   }
 
   el.innerHTML = lista.map(p => {
-    const pct = ((p.parcela_atual - 1) / p.total_parcelas) * 100;
+    const pct       = Math.min(((p.parcela_atual - 1) / p.total_parcelas) * 100, 100);
     const restantes = p.total_parcelas - p.parcela_atual + 1;
 
     return `
@@ -29,34 +31,37 @@ function renderParcelamentos(lista) {
       <div class="item-info" style="flex:1">
         <div class="item-desc">${p.descricao}</div>
         <div class="item-sub">
-          Parcela ${p.parcela_atual}/${p.total_parcelas} 
-          • ${restantes} restantes 
-          • Saldo: ${formatarMoeda(p.valor_restante)}
+          Parcela <strong>${p.parcela_atual}/${p.total_parcelas}</strong>
+          &nbsp;•&nbsp; ${restantes} restante${restantes !== 1 ? 's' : ''}
+          &nbsp;•&nbsp; Saldo: ${formatarMoeda(p.valor_restante)}
         </div>
         <div class="parcela-progresso">
           <div class="parcela-fill" style="width:${pct.toFixed(1)}%"></div>
         </div>
       </div>
-      <div style="text-align:right;margin-left:12px">
-        <div class="item-valor" style="color:var(--accent2)">${formatarMoeda(p.valor_parcela)}<span style="font-size:11px;color:var(--text-muted)">/mês</span></div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Total: ${formatarMoeda(p.valor_total)}</div>
+      <div style="text-align:right;margin-left:12px;flex-shrink:0">
+        <div class="item-valor" style="color:var(--blue)">
+          ${formatarMoeda(p.valor_parcela)}
+          <span style="font-size:11px;color:var(--text-muted)">/mês</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+          Total: ${formatarMoeda(p.valor_total)}
+        </div>
       </div>
       <div class="item-acoes" style="flex-direction:column">
-        <button class="btn-acao success" onclick="avancarParcela(${p.id})" title="Marcar parcela como paga">✅</button>
-        <button class="btn-acao danger" onclick="deletarParcelamento(${p.id})">🗑️</button>
+        <button class="btn-acao success" onclick="avancarParcela(${p.id})" title="Parcela paga">✅</button>
+        <button class="btn-acao"         onclick="abrirEdicao(${p.id})"    title="Editar">✏️</button>
+        <button class="btn-acao danger"  onclick="deletarParcelamento(${p.id})" title="Excluir">🗑️</button>
       </div>
-    </div>
-  `}).join('');
+    </div>`;
+  }).join('');
 }
 
 async function avancarParcela(id) {
   if (!confirm('Marcar parcela atual como paga e avançar?')) return;
   const resp = await apiPatch(`/parcelamentos/${id}/avancar`, {});
-  if (resp?.ok) {
-    carregarParcelamentos();
-  } else {
-    alert(resp?.data?.erro || 'Erro ao avançar parcela.');
-  }
+  if (resp?.ok) carregarParcelamentos();
+  else alert(resp?.data?.erro || 'Erro ao avançar parcela.');
 }
 
 async function deletarParcelamento(id) {
@@ -65,54 +70,74 @@ async function deletarParcelamento(id) {
   if (resp?.ok) carregarParcelamentos();
 }
 
+// ── Calculadora automática ─────────────────────────────────────────
 function calcularParcela() {
   const total = parseFloat(document.getElementById('parValorTotal').value);
-  const numParcelas = parseInt(document.getElementById('parTotalParcelas').value);
-
-  if (total > 0 && numParcelas > 0) {
-    document.getElementById('parValorParcela').value = (total / numParcelas).toFixed(2);
-  }
+  const num   = parseInt(document.getElementById('parTotalParcelas').value);
+  if (total > 0 && num > 0)
+    document.getElementById('parValorParcela').value = (total / num).toFixed(2);
 }
 
+// ── Modal novo ─────────────────────────────────────────────────────
 function abrirModal() {
-  document.getElementById('modalOverlay').classList.remove('hidden');
+  editandoId = null;
+  document.getElementById('modalTitulo').textContent = 'Novo Parcelamento';
   document.getElementById('erroModal').classList.add('hidden');
-
-  const agora = new Date();
-  preencherMesAno('parMesInicio', 'parAnoInicio', agora.getMonth() + 1, agora.getFullYear());
-
-  document.getElementById('parDescricao').value = '';
-  document.getElementById('parValorTotal').value = '';
+  document.getElementById('parDescricao').value    = '';
+  document.getElementById('parValorTotal').value   = '';
   document.getElementById('parTotalParcelas').value = '';
   document.getElementById('parValorParcela').value = '';
+  document.getElementById('parCategoria').value    = 'eletronicos';
+  const agora = new Date();
+  preencherMesAno('parMesInicio', 'parAnoInicio', agora.getMonth() + 1, agora.getFullYear());
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+// ── Modal edição ───────────────────────────────────────────────────
+function abrirEdicao(id) {
+  const p = todosParcelamentos.find(x => x.id === id);
+  if (!p) return;
+  editandoId = id;
+  document.getElementById('modalTitulo').textContent = 'Editar Parcelamento';
+  document.getElementById('erroModal').classList.add('hidden');
+  document.getElementById('parDescricao').value     = p.descricao;
+  document.getElementById('parValorTotal').value    = p.valor_total;
+  document.getElementById('parTotalParcelas').value = p.total_parcelas;
+  document.getElementById('parValorParcela').value  = p.valor_parcela;
+  document.getElementById('parCategoria').value     = p.categoria;
+  preencherMesAno('parMesInicio', 'parAnoInicio', p.mes_inicio, p.ano_inicio);
+  document.getElementById('modalOverlay').classList.remove('hidden');
 }
 
 function fecharModal() {
   document.getElementById('modalOverlay').classList.add('hidden');
+  editandoId = null;
 }
 
 async function salvarParcelamento() {
   const erroEl = document.getElementById('erroModal');
   erroEl.classList.add('hidden');
 
-  const descricao = document.getElementById('parDescricao').value.trim();
-  const valor_total = parseFloat(document.getElementById('parValorTotal').value);
+  const descricao      = document.getElementById('parDescricao').value.trim();
+  const valor_total    = parseFloat(document.getElementById('parValorTotal').value);
   const total_parcelas = parseInt(document.getElementById('parTotalParcelas').value);
-  const valor_parcela = parseFloat(document.getElementById('parValorParcela').value);
-  const categoria = document.getElementById('parCategoria').value;
-  const mes_inicio = parseInt(document.getElementById('parMesInicio').value);
-  const ano_inicio = parseInt(document.getElementById('parAnoInicio').value);
+  const valor_parcela  = parseFloat(document.getElementById('parValorParcela').value);
+  const categoria      = document.getElementById('parCategoria').value;
+  const mes_inicio     = parseInt(document.getElementById('parMesInicio').value);
+  const ano_inicio     = parseInt(document.getElementById('parAnoInicio').value);
 
-  if (!descricao || isNaN(valor_total) || isNaN(total_parcelas) || isNaN(valor_parcela)) {
+  if (!descricao || isNaN(valor_parcela) || isNaN(total_parcelas)) {
     erroEl.textContent = 'Preencha todos os campos corretamente.';
     erroEl.classList.remove('hidden');
     return;
   }
 
-  const resp = await apiPost('/parcelamentos', {
-    descricao, valor_total, valor_parcela, total_parcelas,
-    mes_inicio, ano_inicio, categoria
-  });
+  const corpo = { descricao, valor_total: isNaN(valor_total) ? valor_parcela * total_parcelas : valor_total,
+                  valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria };
+
+  const resp = editandoId
+    ? await apiPut(`/parcelamentos/${editandoId}`, corpo)
+    : await apiPost('/parcelamentos', corpo);
 
   if (!resp || !resp.ok) {
     erroEl.textContent = resp?.data?.erro || 'Erro ao salvar.';
@@ -124,6 +149,4 @@ async function salvarParcelamento() {
   carregarParcelamentos();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(carregarParcelamentos, 100);
-});
+document.addEventListener('DOMContentLoaded', () => { setTimeout(carregarParcelamentos, 100); });

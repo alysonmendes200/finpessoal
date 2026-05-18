@@ -11,14 +11,15 @@
 <body>
   <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <span class="brand-icon-sm">₿</span><span>FinPessoal</span>
+      <div class="fp-logo">FP</div>
+      <span>FinPessoal</span>
     </div>
     <nav class="sidebar-nav">
       <a href="dashboard.html" class="nav-item">📊 Dashboard</a>
-      <a href="receitas.html" class="nav-item">💰 Receitas</a>
-      <a href="despesas.html" class="nav-item active">💳 Despesas</a>
+      <a href="receitas.html"  class="nav-item">💰 Receitas</a>
+      <a href="despesas.html"  class="nav-item active">💳 Despesas</a>
       <a href="parcelamentos.html" class="nav-item">📅 Parcelamentos</a>
-      <a href="previsao.html" class="nav-item">🔮 Previsões</a>
+      <a href="previsao.html"  class="nav-item">🔮 Previsões</a>
     </nav>
     <button class="btn-sair" onclick="sair()">🚪 Sair</button>
   </div>
@@ -60,14 +61,15 @@
     </div>
   </div>
 
-  <!-- MODAL -->
+  <!-- MODAL NOVO / EDIÇÃO -->
   <div class="modal-overlay hidden" id="modalOverlay">
     <div class="modal">
       <div class="modal-header">
-        <h3>Nova Despesa</h3>
+        <h3 id="modalTitulo">Nova Despesa</h3>
         <button onclick="fecharModal()" class="btn-fechar">✕</button>
       </div>
       <div id="erroModal" class="alerta alerta-erro hidden"></div>
+
       <div class="campo">
         <label>Descrição</label>
         <input type="text" id="despDescricao" placeholder="Ex: Aluguel, Mercado, Netflix..." />
@@ -111,7 +113,7 @@
           <select id="despAno"></select>
         </div>
       </div>
-      <button class="btn-primario" onclick="salvarDespesa()">Salvar Despesa</button>
+      <button class="btn-primario" onclick="salvarDespesa()">Salvar</button>
     </div>
   </div>
 

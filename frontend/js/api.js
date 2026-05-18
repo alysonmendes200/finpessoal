@@ -1,6 +1,5 @@
 // ===== FINPESSOAL - API HELPER =====
 
-// Detecta se está em subpasta pages/ ou na raiz
 const API_BASE = '/api';
 
 function getToken() {
@@ -38,19 +37,8 @@ async function apiFetch(url, opcoes = {}) {
   }
 }
 
-// Funções de conveniência
-async function apiGet(url) {
-  return apiFetch(url, { method: 'GET' });
-}
-
-async function apiPost(url, corpo) {
-  return apiFetch(url, { method: 'POST', body: JSON.stringify(corpo) });
-}
-
-async function apiDelete(url) {
-  return apiFetch(url, { method: 'DELETE' });
-}
-
-async function apiPatch(url, corpo) {
-  return apiFetch(url, { method: 'PATCH', body: JSON.stringify(corpo) });
-}
+async function apiGet(url)          { return apiFetch(url, { method: 'GET' }); }
+async function apiPost(url, corpo)  { return apiFetch(url, { method: 'POST',   body: JSON.stringify(corpo) }); }
+async function apiPut(url, corpo)   { return apiFetch(url, { method: 'PUT',    body: JSON.stringify(corpo) }); }
+async function apiPatch(url, corpo) { return apiFetch(url, { method: 'PATCH',  body: JSON.stringify(corpo) }); }
+async function apiDelete(url)       { return apiFetch(url, { method: 'DELETE' }); }

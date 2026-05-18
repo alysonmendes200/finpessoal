@@ -11,14 +11,15 @@
 <body>
   <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <span class="brand-icon-sm">₿</span><span>FinPessoal</span>
+      <div class="fp-logo">FP</div>
+      <span>FinPessoal</span>
     </div>
     <nav class="sidebar-nav">
       <a href="dashboard.html" class="nav-item">📊 Dashboard</a>
-      <a href="receitas.html" class="nav-item">💰 Receitas</a>
-      <a href="despesas.html" class="nav-item">💳 Despesas</a>
+      <a href="receitas.html"  class="nav-item">💰 Receitas</a>
+      <a href="despesas.html"  class="nav-item">💳 Despesas</a>
       <a href="parcelamentos.html" class="nav-item active">📅 Parcelamentos</a>
-      <a href="previsao.html" class="nav-item">🔮 Previsões</a>
+      <a href="previsao.html"  class="nav-item">🔮 Previsões</a>
     </nav>
     <button class="btn-sair" onclick="sair()">🚪 Sair</button>
   </div>
@@ -39,7 +40,7 @@
       </div>
 
       <div class="card-resumo-simples">
-        <span>Total em parcelas ativas:</span>
+        <span>Total de parcelas ativas (por mês):</span>
         <strong id="totalParcelas" class="valor-negativo">R$ 0,00</strong>
       </div>
 
@@ -49,14 +50,15 @@
     </div>
   </div>
 
-  <!-- MODAL -->
+  <!-- MODAL NOVO / EDIÇÃO -->
   <div class="modal-overlay hidden" id="modalOverlay">
     <div class="modal">
       <div class="modal-header">
-        <h3>Novo Parcelamento</h3>
+        <h3 id="modalTitulo">Novo Parcelamento</h3>
         <button onclick="fecharModal()" class="btn-fechar">✕</button>
       </div>
       <div id="erroModal" class="alerta alerta-erro hidden"></div>
+
       <div class="campo">
         <label>Descrição</label>
         <input type="text" id="parDescricao" placeholder="Ex: TV Samsung, Notebook..." />
@@ -98,7 +100,7 @@
           <select id="parAnoInicio"></select>
         </div>
       </div>
-      <button class="btn-primario" onclick="salvarParcelamento()">Salvar Parcelamento</button>
+      <button class="btn-primario" onclick="salvarParcelamento()">Salvar</button>
     </div>
   </div>
 
