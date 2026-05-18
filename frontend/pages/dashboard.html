@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FinPessoal – Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -17,11 +17,12 @@
       <span>FinPessoal</span>
     </div>
     <nav class="sidebar-nav">
-      <a href="dashboard.html" class="nav-item active">📊 Dashboard</a>
-      <a href="receitas.html" class="nav-item">💰 Receitas</a>
-      <a href="despesas.html" class="nav-item">💳 Despesas</a>
-      <a href="parcelamentos.html" class="nav-item">📅 Parcelamentos</a>
-      <a href="previsao.html" class="nav-item">🔮 Previsões</a>
+      <a href="dashboard.html"      class="nav-item active">📊 Dashboard</a>
+      <a href="receitas.html"       class="nav-item">💰 Receitas</a>
+      <a href="despesas.html"       class="nav-item">💳 Despesas</a>
+      <a href="parcelamentos.html"  class="nav-item">📅 Parcelamentos</a>
+      <a href="previsao.html"       class="nav-item">🔮 Previsões</a>
+      <a href="configuracoes.html"  class="nav-item">⚙️ Configurações</a>
     </nav>
     <button class="btn-sair" onclick="sair()">🚪 Sair</button>
   </div>
@@ -42,6 +43,7 @@
     <div class="page-content">
       <h1 class="page-title">Dashboard</h1>
 
+      <!-- CARDS RESUMO -->
       <div class="cards-grid">
         <div class="card card-receita">
           <div class="card-label">Total Receitas</div>
@@ -65,6 +67,12 @@
         </div>
       </div>
 
+      <!-- DIAGNÓSTICO DE SAÚDE ORÇAMENTÁRIA -->
+      <div class="card-diagnostico" id="cardDiagnostico">
+        <!-- preenchido pelo JS -->
+      </div>
+
+      <!-- GRÁFICOS -->
       <div class="graficos-grid">
         <div class="grafico-box">
           <h3>Onde está indo seu dinheiro</h3>
@@ -81,16 +89,6 @@
         </div>
       </div>
 
-      <div class="progresso-box">
-        <h3>Comprometimento da renda</h3>
-        <div class="progresso-info">
-          <span id="progressoTexto">0% comprometido</span>
-          <span id="progressoValores"></span>
-        </div>
-        <div class="barra-progresso">
-          <div class="barra-fill" id="barraFill"></div>
-        </div>
-      </div>
     </div>
   </div>
 

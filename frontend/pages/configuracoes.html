@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinPessoal – Configurações</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="fp-logo">FP</div>
+      <span>FinPessoal</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"     class="nav-item">📊 Dashboard</a>
+      <a href="receitas.html"      class="nav-item">💰 Receitas</a>
+      <a href="despesas.html"      class="nav-item">💳 Despesas</a>
+      <a href="parcelamentos.html" class="nav-item">📅 Parcelamentos</a>
+      <a href="previsao.html"      class="nav-item">🔮 Previsões</a>
+      <a href="configuracoes.html" class="nav-item active">⚙️ Configurações</a>
+    </nav>
+    <button class="btn-sair" onclick="sair()">🚪 Sair</button>
+  </div>
+  <div class="overlay" id="overlay" onclick="fecharMenu()"></div>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+      <div class="topbar-info">
+        <span id="saudacao">Configurações</span>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <h1 class="page-title">⚙️ Configurações</h1>
+
+      <!-- STATUS DO SISTEMA / BACKUP -->
+      <div class="backup-box" style="margin-bottom:20px">
+        <div class="backup-box-icon">🛡️</div>
+        <div class="backup-box-info">
+          <h4>Backup Automático do Sistema</h4>
+          <p id="backupStatus">Verificando...</p>
+        </div>
+      </div>
+
+      <!-- CATEGORIAS DE RECEITAS -->
+      <div class="config-section">
+        <div class="config-section-header">
+          <h3>💰 Categorias de Receitas</h3>
+          <button class="btn-primario btn-sm" onclick="abrirModalCategoria('receita')">+ Adicionar</button>
+        </div>
+        <div class="config-lista" id="listaCatReceitas">
+          <p style="color:var(--text-muted);font-size:13px;padding:8px 0">Carregando...</p>
+        </div>
+      </div>
+
+      <!-- CATEGORIAS DE DESPESAS -->
+      <div class="config-section">
+        <div class="config-section-header">
+          <h3>💳 Categorias de Despesas</h3>
+          <button class="btn-primario btn-sm" onclick="abrirModalCategoria('despesa')">+ Adicionar</button>
+        </div>
+        <div class="config-lista" id="listaCatDespesas">
+          <p style="color:var(--text-muted);font-size:13px;padding:8px 0">Carregando...</p>
+        </div>
+      </div>
+
+      <!-- TIPOS DE DESPESAS -->
+      <div class="config-section">
+        <div class="config-section-header">
+          <h3>🏷️ Tipos de Despesas</h3>
+          <button class="btn-primario btn-sm" onclick="abrirModalTipo()">+ Adicionar</button>
+        </div>
+        <div class="config-lista" id="listaTipos">
+          <p style="color:var(--text-muted);font-size:13px;padding:8px 0">Carregando...</p>
+        </div>
+      </div>
+
+      <!-- INFORMAÇÕES DA CONTA -->
+      <div class="config-section">
+        <div class="config-section-header">
+          <h3>👤 Informações da Conta</h3>
+        </div>
+        <div style="padding:16px 20px;font-size:14px;color:var(--text-muted)">
+          <p id="infoUsuario">–</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL CATEGORIA (Receita ou Despesa) -->
+  <div class="modal-overlay hidden" id="modalCatOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalCatTitulo">Nova Categoria</h3>
+        <button onclick="fecharModalCat()" class="btn-fechar">✕</button>
+      </div>
+      <div id="erroCat" class="alerta alerta-erro hidden"></div>
+      <div class="campo">
+        <label>Nome da Categoria</label>
+        <input type="text" id="catNome" placeholder="Ex: Salário, Lazer..." />
+      </div>
+      <button class="btn-primario" onclick="salvarCategoria()">Salvar</button>
+    </div>
+  </div>
+
+  <!-- MODAL TIPO DE DESPESA -->
+  <div class="modal-overlay hidden" id="modalTipoOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTipoTitulo">Novo Tipo de Despesa</h3>
+        <button onclick="fecharModalTipo()" class="btn-fechar">✕</button>
+      </div>
+      <div id="erroTipo" class="alerta alerta-erro hidden"></div>
+      <div class="campo">
+        <label>Nome do Tipo</label>
+        <input type="text" id="tipoNome" placeholder="Ex: Investimento, Imposto..." />
+      </div>
+      <div class="campo">
+        <label>Código (interno)</label>
+        <input type="text" id="tipoCodigo" placeholder="Ex: investimento, imposto" />
+      </div>
+      <button class="btn-primario" onclick="salvarTipo()">Salvar</button>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/app.js"></script>
+  <script src="../js/configuracoes.js"></script>
+</body>
+</html>
