@@ -10,18 +10,21 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+
+  <!-- ═══ SIDEBAR ═══ -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="fp-logo">FP</div>
       <span>FinPessoal</span>
     </div>
+    <div class="sidebar-user" id="sidebarUser"></div>
     <nav class="sidebar-nav">
       <a href="dashboard.html"     class="nav-item">📊 Dashboard</a>
       <a href="receitas.html"      class="nav-item">💰 Receitas</a>
       <a href="despesas.html"      class="nav-item">💳 Despesas</a>
       <a href="parcelamentos.html" class="nav-item">📅 Parcelamentos</a>
       <a href="previsao.html"      class="nav-item active">🔮 Previsões</a>
-      <a href="configuracoes.html" class="nav-item">⚙️ Configurações</a>
+      <a href="configuracoes.html" class="nav-item">⚙️ Configurações e Perfil</a>
     </nav>
     <button class="btn-sair" onclick="sair()">🚪 Sair</button>
   </div>
@@ -42,7 +45,6 @@
     <div class="page-content">
       <h1 class="page-title">🔮 Simulação de Previsão</h1>
 
-      <!-- CARDS RESUMO -->
       <div class="cards-grid">
         <div class="card card-receita">
           <div class="card-label">Receitas Projetadas</div>
@@ -66,12 +68,8 @@
         </div>
       </div>
 
-      <!-- DIAGNÓSTICO -->
-      <div class="card-diagnostico" id="cardDiagnostico">
-        <!-- preenchido pelo JS -->
-      </div>
+      <div class="card-diagnostico" id="cardDiagnostico"></div>
 
-      <!-- ALERTA FATURA FANTASMA -->
       <div class="fatura-fantasma-box" id="faturaFantasmaBox" style="display:none">
         <div class="fatura-fantasma-icon">👻</div>
         <div class="fatura-fantasma-info">
@@ -81,7 +79,6 @@
         <div class="fatura-fantasma-val" id="faturaFantasmaVal">R$ 0,00</div>
       </div>
 
-      <!-- REGRA 50/30/20 -->
       <div class="regra-box">
         <h3>📐 Método 50/30/20 – Alocação Orçamentária</h3>
         <div class="regra-grid">
@@ -89,57 +86,39 @@
             <div class="regra-label">50% – Necessidades</div>
             <div class="regra-valor" id="reg50Val">R$ 0,00</div>
             <div class="regra-ideal" id="reg50Ideal">Ideal: R$ 0,00</div>
-            <div style="margin-top:8px">
-              <div class="barra-progresso">
-                <div class="barra-fill" id="reg50Bar" style="width:0%;background:#2563eb"></div>
-              </div>
-            </div>
+            <div style="margin-top:8px"><div class="barra-progresso"><div class="barra-fill" id="reg50Bar" style="width:0%;background:#2563eb"></div></div></div>
           </div>
           <div class="regra-item desejos">
             <div class="regra-label">30% – Desejos</div>
             <div class="regra-valor" id="reg30Val">R$ 0,00</div>
             <div class="regra-ideal" id="reg30Ideal">Ideal: R$ 0,00</div>
-            <div style="margin-top:8px">
-              <div class="barra-progresso">
-                <div class="barra-fill" id="reg30Bar" style="width:0%;background:#7c3aed"></div>
-              </div>
-            </div>
+            <div style="margin-top:8px"><div class="barra-progresso"><div class="barra-fill" id="reg30Bar" style="width:0%;background:#7c3aed"></div></div></div>
           </div>
           <div class="regra-item futuro">
             <div class="regra-label">20% – Futuro</div>
             <div class="regra-valor" id="reg20Val">R$ 0,00</div>
             <div class="regra-ideal" id="reg20Ideal">Ideal: R$ 0,00</div>
-            <div style="margin-top:8px">
-              <div class="barra-progresso">
-                <div class="barra-fill" id="reg20Bar" style="width:0%;background:#059669"></div>
-              </div>
-            </div>
+            <div style="margin-top:8px"><div class="barra-progresso"><div class="barra-fill" id="reg20Bar" style="width:0%;background:#059669"></div></div></div>
           </div>
         </div>
       </div>
 
-      <!-- SIMULADOR DE IMPACTO DE NOVA COMPRA -->
       <div class="simulador-box">
         <h3>🛒 Simulador de Impacto de Nova Compra</h3>
         <div class="simulador-campos">
           <div class="campo" style="margin-bottom:0">
-            <label>Valor total da compra (R$)</label>
-            <input type="number" id="simValor" placeholder="0,00" step="0.01" min="0"
-                   oninput="atualizarSimulador()" />
+            <label>Valor total (R$)</label>
+            <input type="number" id="simValor" placeholder="0,00" step="0.01" min="0" oninput="atualizarSimulador()" />
           </div>
           <div class="campo" style="margin-bottom:0">
             <label>Nº de parcelas</label>
-            <input type="number" id="simParcelas" placeholder="1" min="1" value="1"
-                   oninput="atualizarSimulador()" />
+            <input type="number" id="simParcelas" placeholder="1" min="1" value="1" oninput="atualizarSimulador()" />
           </div>
-          <button class="btn-primario btn-sm" onclick="atualizarSimulador()" style="margin-top:0">
-            Simular Impacto
-          </button>
+          <button class="btn-primario btn-sm" onclick="atualizarSimulador()" style="margin-top:0">Simular</button>
         </div>
         <div id="simResumo" style="margin-top:10px;font-size:13px;color:#0369a1;font-weight:500"></div>
       </div>
 
-      <!-- GRÁFICO PROJEÇÃO 6 MESES -->
       <div class="grafico-box" style="margin-bottom:18px">
         <h3>Projeção dos próximos 6 meses</h3>
         <div class="grafico-wrapper" style="height:280px">
@@ -147,51 +126,32 @@
         </div>
       </div>
 
-      <!-- TABELAS DETALHADAS -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px" id="tabelasGrid">
         <div class="tabela-wrapper">
           <div class="tabela-titulo">📥 Entradas Projetadas</div>
           <div class="tabela-scroll">
-            <table>
-              <thead><tr><th>Descrição</th><th>Tipo</th><th style="text-align:right">Valor</th></tr></thead>
-              <tbody id="tabelaEntradas">
-                <tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:20px">Carregando...</td></tr>
-              </tbody>
-            </table>
+            <table><thead><tr><th>Descrição</th><th>Tipo</th><th style="text-align:right">Valor</th></tr></thead>
+            <tbody id="tabelaEntradas"><tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:20px">Carregando...</td></tr></tbody></table>
           </div>
         </div>
         <div class="tabela-wrapper">
           <div class="tabela-titulo">📤 Saídas Projetadas</div>
           <div class="tabela-scroll">
-            <table>
-              <thead><tr><th>Descrição</th><th>Tipo</th><th style="text-align:right">Valor</th></tr></thead>
-              <tbody id="tabelaSaidas">
-                <tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:20px">Carregando...</td></tr>
-              </tbody>
-            </table>
+            <table><thead><tr><th>Descrição</th><th>Tipo</th><th style="text-align:right">Valor</th></tr></thead>
+            <tbody id="tabelaSaidas"><tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:20px">Carregando...</td></tr></tbody></table>
           </div>
         </div>
       </div>
 
-      <!-- PARCELAMENTOS ATIVOS -->
       <div class="tabela-wrapper">
         <div class="tabela-titulo">🔄 Parcelamentos Ativos no Mês</div>
         <div class="tabela-scroll">
           <table>
-            <thead>
-              <tr>
-                <th>Descrição</th><th>Parcela</th><th>Categoria</th>
-                <th style="text-align:right">Valor/mês</th>
-                <th style="text-align:right">A pagar</th>
-              </tr>
-            </thead>
-            <tbody id="tabelaParcelamentos">
-              <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Carregando...</td></tr>
-            </tbody>
+            <thead><tr><th>Descrição</th><th>Parcela</th><th>Categoria</th><th style="text-align:right">Valor/mês</th><th style="text-align:right">A pagar</th></tr></thead>
+            <tbody id="tabelaParcelamentos"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Carregando...</td></tr></tbody>
           </table>
         </div>
       </div>
-
     </div>
   </div>
 

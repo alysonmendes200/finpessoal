@@ -10,25 +10,25 @@
 </head>
 <body>
 
-  <!-- ═══ SIDEBAR UNIFICADA ═══ -->
+  <!-- ═══ SIDEBAR ═══ -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="fp-logo">FP</div>
       <span>FinPessoal</span>
     </div>
+    <div class="sidebar-user" id="sidebarUser"></div>
     <nav class="sidebar-nav">
       <a href="dashboard.html"     class="nav-item">📊 Dashboard</a>
       <a href="receitas.html"      class="nav-item">💰 Receitas</a>
       <a href="despesas.html"      class="nav-item active">💳 Despesas</a>
       <a href="parcelamentos.html" class="nav-item">📅 Parcelamentos</a>
       <a href="previsao.html"      class="nav-item">🔮 Previsões</a>
-      <a href="configuracoes.html" class="nav-item">⚙️ Configurações</a>
+      <a href="configuracoes.html" class="nav-item">⚙️ Configurações e Perfil</a>
     </nav>
     <button class="btn-sair" onclick="sair()">🚪 Sair</button>
   </div>
   <div class="overlay" id="overlay" onclick="fecharMenu()"></div>
 
-  <!-- ═══ CONTEÚDO ═══ -->
   <div class="main-content">
     <header class="topbar">
       <button class="menu-toggle" onclick="toggleMenu()">☰</button>
@@ -52,9 +52,9 @@
         <strong id="totalMes" class="valor-negativo">R$ 0,00</strong>
       </div>
 
-      <!-- filtros dinâmicos (gerados pelo JS após carregar tipos da API) -->
+      <!-- filtros gerados dinamicamente pelo JS -->
       <div class="filtros-tipo" id="filtrosTipo">
-        <button class="filtro-btn active" onclick="filtrarTipo('todos', this)">Todos</button>
+        <button class="filtro-btn active" onclick="filtrarTipo('todos',this)">Todos</button>
       </div>
 
       <div id="listaDespesas" class="lista-itens">
@@ -63,7 +63,7 @@
     </div>
   </div>
 
-  <!-- ═══ MODAL DESPESA (novo / edição) ═══ -->
+  <!-- MODAL DESPESA -->
   <div class="modal-overlay hidden" id="modalOverlay">
     <div class="modal">
       <div class="modal-header">
@@ -71,7 +71,6 @@
         <button onclick="fecharModal()" class="btn-fechar">✕</button>
       </div>
       <div id="erroModal" class="alerta alerta-erro hidden"></div>
-
       <div class="campo">
         <label>Descrição</label>
         <input type="text" id="despDescricao" placeholder="Ex: Aluguel, Mercado, Netflix..." />
@@ -83,24 +82,16 @@
       <div class="campo-linha">
         <div class="campo">
           <label>Categoria</label>
-          <!-- preenchido dinamicamente pela API -->
           <select id="despCategoria"><option value="">Carregando...</option></select>
         </div>
         <div class="campo">
           <label>Tipo</label>
-          <!-- preenchido dinamicamente pela API -->
           <select id="despTipo"><option value="">Carregando...</option></select>
         </div>
       </div>
       <div class="campo-linha">
-        <div class="campo">
-          <label>Mês</label>
-          <select id="despMes"></select>
-        </div>
-        <div class="campo">
-          <label>Ano</label>
-          <select id="despAno"></select>
-        </div>
+        <div class="campo"><label>Mês</label><select id="despMes"></select></div>
+        <div class="campo"><label>Ano</label><select id="despAno"></select></div>
       </div>
       <button class="btn-primario" onclick="salvarDespesa()">Salvar</button>
     </div>

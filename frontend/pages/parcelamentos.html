@@ -10,25 +10,25 @@
 </head>
 <body>
 
-  <!-- ═══ SIDEBAR UNIFICADA ═══ -->
+  <!-- ═══ SIDEBAR ═══ -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="fp-logo">FP</div>
       <span>FinPessoal</span>
     </div>
+    <div class="sidebar-user" id="sidebarUser"></div>
     <nav class="sidebar-nav">
       <a href="dashboard.html"     class="nav-item">📊 Dashboard</a>
       <a href="receitas.html"      class="nav-item">💰 Receitas</a>
       <a href="despesas.html"      class="nav-item">💳 Despesas</a>
       <a href="parcelamentos.html" class="nav-item active">📅 Parcelamentos</a>
       <a href="previsao.html"      class="nav-item">🔮 Previsões</a>
-      <a href="configuracoes.html" class="nav-item">⚙️ Configurações</a>
+      <a href="configuracoes.html" class="nav-item">⚙️ Configurações e Perfil</a>
     </nav>
     <button class="btn-sair" onclick="sair()">🚪 Sair</button>
   </div>
   <div class="overlay" id="overlay" onclick="fecharMenu()"></div>
 
-  <!-- ═══ CONTEÚDO ═══ -->
   <div class="main-content">
     <header class="topbar">
       <button class="menu-toggle" onclick="toggleMenu()">☰</button>
@@ -54,7 +54,7 @@
     </div>
   </div>
 
-  <!-- ═══ MODAL PARCELAMENTO (novo / edição) ═══ -->
+  <!-- MODAL PARCELAMENTO -->
   <div class="modal-overlay hidden" id="modalOverlay">
     <div class="modal">
       <div class="modal-header">
@@ -62,7 +62,6 @@
         <button onclick="fecharModal()" class="btn-fechar">✕</button>
       </div>
       <div id="erroModal" class="alerta alerta-erro hidden"></div>
-
       <div class="campo">
         <label>Descrição</label>
         <input type="text" id="parDescricao" placeholder="Ex: TV Samsung, Notebook..." />
@@ -83,18 +82,11 @@
       </div>
       <div class="campo">
         <label>Categoria</label>
-        <!-- preenchido dinamicamente pela API (categorias de despesas) -->
         <select id="parCategoria"><option value="">Carregando...</option></select>
       </div>
       <div class="campo-linha">
-        <div class="campo">
-          <label>Mês de Início</label>
-          <select id="parMesInicio"></select>
-        </div>
-        <div class="campo">
-          <label>Ano de Início</label>
-          <select id="parAnoInicio"></select>
-        </div>
+        <div class="campo"><label>Mês de Início</label><select id="parMesInicio"></select></div>
+        <div class="campo"><label>Ano de Início</label><select id="parAnoInicio"></select></div>
       </div>
       <button class="btn-primario" onclick="salvarParcelamento()">Salvar</button>
     </div>

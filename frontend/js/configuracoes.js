@@ -1,8 +1,23 @@
-// ===== FINPESSOAL – CONFIGURAÇÕES JS =====
+// ===== FINPESSOAL – CONFIGURAÇÕES v3 (Accordion) =====
 
-let _tipoModal    = null;  // 'receita' | 'despesa'
+let _tipoModal     = null;   // 'receita' | 'despesa'
 let _editandoCatId = null;
-let _editandoTipoId = null;
+
+// ── Accordion ─────────────────────────────────────────────────────
+const _accordionState = {};   // { perfil: false, catRec: false, ... }
+
+function toggleAccordion(id) {
+  const corpo = document.getElementById(`corpo-${id}`);
+  const chev  = document.getElementById(`chev-${id}`);
+  const header = corpo.previousElementSibling;
+
+  const abrindo = !_accordionState[id];
+  _accordionState[id] = abrindo;
+
+  corpo.classList.toggle('aberto', abrindo);
+  chev.classList.toggle('aberto', abrindo);
+  header.classList.toggle('aberto', abrindo);
+}
 
 // ── Inicialização ─────────────────────────────────────────────────
 async function carregarPagina() {
@@ -12,25 +27,99 @@ async function carregarPagina() {
   const d = resp.data;
   renderCatReceitas(d.categorias_receitas);
   renderCatDespesas(d.categorias_despesas);
-  renderTipos(d.tipos_despesas);
   renderBackup(d.ultimo_backup);
+  carregarPerfil();
+}
 
-  const u = getUsuario();
-  if (u) {
-    document.getElementById('infoUsuario').textContent =
-      `Nome: ${u.nome} · E-mail: ${u.email}`;
+// ── PERFIL ────────────────────────────────────────────────────────
+async function carregarPerfil() {
+  const resp = await apiGet('/auth/perfil');
+  if (!resp || !resp.ok) return;
+  const u = resp.data;
+
+  document.getElementById('perfilNome').value    = u.nome    || '';
+  document.getElementById('perfilFotoUrl').value = u.foto_url || '';
+
+  atualizarPreviewPerfil(u.nome, u.email, u.foto_url);
+}
+
+function atualizarPreviewPerfil(nome, email, fotoUrl) {
+  document.getElementById('perfilNomePreview').textContent  = nome  || '–';
+  document.getElementById('perfilEmailPreview').textContent = email || '–';
+
+  const avatar = document.getElementById('perfilAvatarPreview');
+  if (fotoUrl) {
+    avatar.innerHTML = `<img src="${fotoUrl}" alt="Foto" onerror="this.parentElement.innerHTML='${(nome||'?')[0].toUpperCase()}'" />`;
+  } else {
+    avatar.textContent = nome ? nome.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase() : '?';
   }
 }
 
-// ── Backup Status ─────────────────────────────────────────────────
+function previewFoto() {
+  const url  = document.getElementById('perfilFotoUrl').value.trim();
+  const nome = document.getElementById('perfilNome').value.trim();
+  const u    = getUsuario();
+  atualizarPreviewPerfil(nome || u?.nome, u?.email, url);
+}
+
+async function salvarPerfil() {
+  const erroEl = document.getElementById('erroSucesoPerfil');
+  erroEl.classList.remove('alerta-erro','alerta-sucesso','hidden');
+
+  const nome       = document.getElementById('perfilNome').value.trim();
+  const foto_url   = document.getElementById('perfilFotoUrl').value.trim();
+  const senhaAtual = document.getElementById('perfilSenhaAtual').value;
+  const novaSenha  = document.getElementById('perfilNovaSenha').value;
+
+  if (!nome) {
+    erroEl.textContent = 'O nome não pode ficar vazio.';
+    erroEl.classList.add('alerta-erro');
+    erroEl.classList.remove('hidden');
+    return;
+  }
+
+  const corpo = { nome, foto_url: foto_url || null };
+  if (novaSenha) { corpo.senha_atual = senhaAtual; corpo.nova_senha = novaSenha; }
+
+  const resp = await apiPut('/auth/perfil', corpo);
+
+  if (!resp || !resp.ok) {
+    erroEl.textContent = resp?.data?.erro || 'Erro ao salvar.';
+    erroEl.classList.add('alerta-erro');
+    erroEl.classList.remove('hidden');
+    return;
+  }
+
+  // Atualiza token e dados em localStorage
+  localStorage.setItem('fp_token', resp.data.token);
+  localStorage.setItem('fp_usuario', JSON.stringify(resp.data.usuario));
+
+  // Atualiza sidebar imediatamente
+  renderizarSidebarUser();
+
+  // Limpa campos de senha
+  document.getElementById('perfilSenhaAtual').value = '';
+  document.getElementById('perfilNovaSenha').value  = '';
+
+  // Exibe sucesso
+  erroEl.textContent = '✅ Perfil salvo com sucesso!';
+  erroEl.classList.add('alerta-sucesso');
+  erroEl.classList.remove('hidden');
+
+  // Atualiza preview
+  atualizarPreviewPerfil(resp.data.usuario.nome, resp.data.usuario.email, resp.data.usuario.foto_url);
+
+  setTimeout(() => erroEl.classList.add('hidden'), 3000);
+}
+
+// ── BACKUP ────────────────────────────────────────────────────────
 function renderBackup(backup) {
   const el = document.getElementById('backupStatus');
   if (!backup) {
-    el.textContent = 'Nenhum backup registrado ainda. O primeiro ocorre 5s após o servidor iniciar.';
+    el.textContent = 'Nenhum backup registrado ainda. O primeiro ocorre ~5s após o servidor iniciar.';
     return;
   }
-  const dt = new Date(backup.realizado_em);
-  const fmt = dt.toLocaleString('pt-BR');
+  const fmt = new Date(backup.realizado_em).toLocaleString('pt-BR');
   el.innerHTML = `Último backup automático realizado em: <strong>${fmt}</strong>
     &nbsp;·&nbsp; Status: <strong style="color:var(--green)">${backup.status}</strong>`;
 }
@@ -39,7 +128,7 @@ function renderBackup(backup) {
 function renderCatReceitas(lista) {
   const el = document.getElementById('listaCatReceitas');
   if (!lista?.length) {
-    el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0">Nenhuma categoria cadastrada.</p>';
+    el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Nenhuma categoria cadastrada.</p>';
     return;
   }
   el.innerHTML = lista.map(c => `
@@ -54,8 +143,7 @@ function renderCatReceitas(lista) {
 }
 
 function editarCatReceita(id, nome) {
-  _tipoModal     = 'receita';
-  _editandoCatId = id;
+  _tipoModal = 'receita'; _editandoCatId = id;
   document.getElementById('modalCatTitulo').textContent = 'Editar Categoria de Receita';
   document.getElementById('catNome').value = nome;
   document.getElementById('erroCat').classList.add('hidden');
@@ -63,7 +151,7 @@ function editarCatReceita(id, nome) {
 }
 
 async function deletarCatReceita(id) {
-  if (!confirm('Remover esta categoria?')) return;
+  if (!confirm('Remover esta categoria? Receitas já lançadas não serão afetadas.')) return;
   const resp = await apiDelete(`/configuracoes/categorias-receitas/${id}`);
   if (resp?.ok) carregarPagina();
 }
@@ -72,7 +160,7 @@ async function deletarCatReceita(id) {
 function renderCatDespesas(lista) {
   const el = document.getElementById('listaCatDespesas');
   if (!lista?.length) {
-    el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0">Nenhuma categoria cadastrada.</p>';
+    el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Nenhuma categoria cadastrada.</p>';
     return;
   }
   el.innerHTML = lista.map(c => `
@@ -87,8 +175,7 @@ function renderCatDespesas(lista) {
 }
 
 function editarCatDespesa(id, nome) {
-  _tipoModal     = 'despesa';
-  _editandoCatId = id;
+  _tipoModal = 'despesa'; _editandoCatId = id;
   document.getElementById('modalCatTitulo').textContent = 'Editar Categoria de Despesa';
   document.getElementById('catNome').value = nome;
   document.getElementById('erroCat').classList.add('hidden');
@@ -96,55 +183,21 @@ function editarCatDespesa(id, nome) {
 }
 
 async function deletarCatDespesa(id) {
-  if (!confirm('Remover esta categoria?')) return;
+  if (!confirm('Remover esta categoria? Despesas já lançadas não serão afetadas.')) return;
   const resp = await apiDelete(`/configuracoes/categorias-despesas/${id}`);
   if (resp?.ok) carregarPagina();
 }
 
-// ── TIPOS DE DESPESAS ─────────────────────────────────────────────
-function renderTipos(lista) {
-  const el = document.getElementById('listaTipos');
-  if (!lista?.length) {
-    el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0">Nenhum tipo cadastrado.</p>';
-    return;
-  }
-  el.innerHTML = lista.map(t => `
-    <div class="config-item">
-      <span class="item-emoji">🏷️</span>
-      <span class="config-item-nome">${t.nome}</span>
-      <span class="config-item-codigo">(${t.codigo})</span>
-      <div class="item-acoes">
-        <button class="btn-acao" onclick="editarTipo(${t.id},'${t.nome.replace(/'/g,"\\'")}','${t.codigo}')">✏️</button>
-        <button class="btn-acao danger" onclick="deletarTipo(${t.id})">🗑️</button>
-      </div>
-    </div>`).join('');
-}
-
-async function deletarTipo(id) {
-  if (!confirm('Remover este tipo?')) return;
-  const resp = await apiDelete(`/configuracoes/tipos-despesas/${id}`);
-  if (resp?.ok) carregarPagina();
-}
-
-function editarTipo(id, nome, codigo) {
-  _editandoTipoId = id;
-  document.getElementById('modalTipoTitulo').textContent = 'Editar Tipo de Despesa';
-  document.getElementById('tipoNome').value   = nome;
-  document.getElementById('tipoCodigo').value = codigo;
-  document.getElementById('erroTipo').classList.add('hidden');
-  document.getElementById('modalTipoOverlay').classList.remove('hidden');
-}
-
-// ── Modais de Categoria ───────────────────────────────────────────
+// ── Modal Categoria ───────────────────────────────────────────────
 function abrirModalCategoria(tipo) {
-  _tipoModal     = tipo;
-  _editandoCatId = null;
+  _tipoModal = tipo; _editandoCatId = null;
   document.getElementById('modalCatTitulo').textContent =
     tipo === 'receita' ? 'Nova Categoria de Receita' : 'Nova Categoria de Despesa';
   document.getElementById('catNome').value = '';
   document.getElementById('erroCat').classList.add('hidden');
   document.getElementById('modalCatOverlay').classList.remove('hidden');
 }
+
 function fecharModalCat() {
   document.getElementById('modalCatOverlay').classList.add('hidden');
   _editandoCatId = null;
@@ -172,38 +225,5 @@ async function salvarCategoria() {
   carregarPagina();
 }
 
-// ── Modais de Tipo ────────────────────────────────────────────────
-function abrirModalTipo() {
-  _editandoTipoId = null;
-  document.getElementById('modalTipoTitulo').textContent = 'Novo Tipo de Despesa';
-  document.getElementById('tipoNome').value   = '';
-  document.getElementById('tipoCodigo').value = '';
-  document.getElementById('erroTipo').classList.add('hidden');
-  document.getElementById('modalTipoOverlay').classList.remove('hidden');
-}
-function fecharModalTipo() {
-  document.getElementById('modalTipoOverlay').classList.add('hidden');
-  _editandoTipoId = null;
-}
-
-async function salvarTipo() {
-  const erroEl = document.getElementById('erroTipo');
-  erroEl.classList.add('hidden');
-  const nome   = document.getElementById('tipoNome').value.trim();
-  const codigo = document.getElementById('tipoCodigo').value.trim().toLowerCase().replace(/\s+/g,'_');
-  if (!nome || (!_editandoTipoId && !codigo)) {
-    erroEl.textContent = 'Preencha nome e código.'; erroEl.classList.remove('hidden'); return;
-  }
-
-  const resp = _editandoTipoId
-    ? await apiPut(`/configuracoes/tipos-despesas/${_editandoTipoId}`, { nome })
-    : await apiPost('/configuracoes/tipos-despesas', { nome, codigo });
-
-  if (!resp || !resp.ok) {
-    erroEl.textContent = resp?.data?.erro || 'Erro ao salvar.'; erroEl.classList.remove('hidden'); return;
-  }
-  fecharModalTipo();
-  carregarPagina();
-}
-
+// ── Init ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => { setTimeout(carregarPagina, 150); });
