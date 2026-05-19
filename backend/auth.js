@@ -1,66 +1,147 @@
-require('dotenv').config();
 const express = require('express');
-const cors    = require('cors');
-const path    = require('path');
-const cron    = require('node-cron');
-const { initDB, pool } = require('./db');
+const { pool } = require('../db');
+const { autenticarAdmin } = require('../middleware');
+const router = express.Router();
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
+// Todas as rotas exigem perfil='admin'
 
-app.use(cors());
-app.use(express.json({ limit: '2mb' })); // base64 de foto pode ser grande
-
-// Uploads (caso ainda haja arquivos legados)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-// Frontend estático
-app.use(express.static(path.join(__dirname, '../frontend')));
-
-// ── Rotas da API ─────────────────────────────────────────────────
-app.use('/api/auth',           require('./routes/auth'));
-app.use('/api/admin',          require('./routes/admin'));
-app.use('/api/receitas',       require('./routes/receitas'));
-app.use('/api/despesas',       require('./routes/despesas'));
-app.use('/api/parcelamentos',  require('./routes/parcelamentos'));
-app.use('/api/dashboard',      require('./routes/dashboard'));
-app.use('/api/previsao',       require('./routes/previsao'));
-app.use('/api/configuracoes',  require('./routes/configuracoes'));
-
-// Fallback SPA
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+// ── GET /api/admin/usuarios — lista todos os usuários ─────────────
+// Retorna apenas campos de gestão — NUNCA dados financeiros
+router.get('/usuarios', autenticarAdmin, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT
+        u.id, u.nome, u.email, u.perfil,
+        u.licenca_ate, u.bloqueado, u.criado_em,
+        -- Dias restantes de licença (NULL se sem licença)
+        CASE
+          WHEN u.licenca_ate IS NULL THEN NULL
+          WHEN u.licenca_ate >= CURRENT_DATE THEN (u.licenca_ate - CURRENT_DATE)
+          ELSE -1 * (CURRENT_DATE - u.licenca_ate)
+        END AS dias_licenca,
+        -- Situação da licença
+        CASE
+          WHEN u.perfil = 'admin'            THEN 'admin'
+          WHEN u.bloqueado                   THEN 'bloqueado'
+          WHEN u.licenca_ate IS NULL         THEN 'sem_licenca'
+          WHEN u.licenca_ate < CURRENT_DATE  THEN 'expirada'
+          WHEN u.licenca_ate - CURRENT_DATE <= 7 THEN 'expirando'
+          ELSE 'ativa'
+        END AS situacao
+      FROM usuarios u
+      ORDER BY u.criado_em DESC
+    `);
+    res.json(r.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao listar usuários.' });
+  }
 });
 
-// ── Backup automático 12h ─────────────────────────────────────────
-async function executarBackup() {
-  const client = await pool.connect();
-  try {
-    const usuarios = await client.query('SELECT id FROM usuarios');
-    for (const u of usuarios.rows) {
-      const uid = u.id;
-      const [r1, r2, r3, r4] = await Promise.all([
-        client.query('SELECT COUNT(*) FROM receitas       WHERE usuario_id=$1', [uid]),
-        client.query('SELECT COUNT(*) FROM despesas       WHERE usuario_id=$1', [uid]),
-        client.query('SELECT COUNT(*) FROM parcelamentos  WHERE usuario_id=$1', [uid]),
-        client.query('SELECT COUNT(*) FROM receitas_parceladas WHERE usuario_id=$1', [uid])
-      ]);
-      await client.query(
-        `INSERT INTO backup_log (usuario_id, status, detalhes) VALUES ($1, 'sucesso', $2)`,
-        [uid, JSON.stringify({
-          backup_em: new Date().toISOString(),
-          receitas: r1.rows[0].count, despesas: r2.rows[0].count,
-          parcelamentos: r3.rows[0].count, rec_parceladas: r4.rows[0].count
-        })]
-      );
-    }
-    console.log(`✅ Backup em ${new Date().toLocaleString('pt-BR')}`);
-  } catch (err) {
-    console.error('❌ Erro no backup:', err.message);
-  } finally { client.release(); }
-}
+// ── PUT /api/admin/usuarios/:id/licenca ───────────────────────────
+// Define a data de expiração da licença
+// Body: { dias: 30 }  OU  { licenca_ate: "2025-12-31" }
+router.put('/usuarios/:id/licenca', autenticarAdmin, async (req, res) => {
+  const uid = parseInt(req.params.id);
+  if (uid === req.usuario.id)
+    return res.status(400).json({ erro: 'Você não pode alterar sua própria licença por aqui.' });
 
-initDB().then(() => {
-  app.listen(PORT, () => console.log(`🚀 FinPessoal na porta ${PORT}`));
-  cron.schedule('0 */12 * * *', executarBackup);
-  setTimeout(executarBackup, 5000);
-}).catch(err => { console.error(err); process.exit(1); });
+  let licenca_ate;
+  if (req.body.dias !== undefined) {
+    const dias = parseInt(req.body.dias);
+    if (isNaN(dias) || dias < 1)
+      return res.status(400).json({ erro: 'Número de dias inválido. Mínimo: 1.' });
+    // Calcula a partir de HOJE (ou da data atual da licença, o que for maior)
+    const base = new Date();
+    base.setDate(base.getDate() + dias);
+    licenca_ate = base.toISOString().split('T')[0]; // YYYY-MM-DD
+  } else if (req.body.licenca_ate) {
+    licenca_ate = req.body.licenca_ate;
+  } else {
+    return res.status(400).json({ erro: 'Informe "dias" ou "licenca_ate".' });
+  }
+
+  try {
+    const r = await pool.query(
+      `UPDATE usuarios SET licenca_ate=$1 WHERE id=$2 AND perfil != 'admin'
+       RETURNING id, nome, email, perfil, licenca_ate, bloqueado`,
+      [licenca_ate, uid]
+    );
+    if (!r.rows.length) return res.status(404).json({ erro: 'Usuário não encontrado ou é admin.' });
+    res.json({ mensagem: 'Licença atualizada.', usuario: r.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao atualizar licença.' });
+  }
+});
+
+// ── PUT /api/admin/usuarios/:id/bloquear ─────────────────────────
+// Bloqueia ou desbloqueia um usuário
+// Body: { bloqueado: true/false }
+router.put('/usuarios/:id/bloquear', autenticarAdmin, async (req, res) => {
+  const uid = parseInt(req.params.id);
+  if (uid === req.usuario.id)
+    return res.status(400).json({ erro: 'Você não pode bloquear a si mesmo.' });
+
+  const { bloqueado } = req.body;
+  if (typeof bloqueado !== 'boolean')
+    return res.status(400).json({ erro: '"bloqueado" deve ser true ou false.' });
+
+  try {
+    const r = await pool.query(
+      `UPDATE usuarios SET bloqueado=$1 WHERE id=$2 AND perfil != 'admin'
+       RETURNING id, nome, email, perfil, licenca_ate, bloqueado`,
+      [bloqueado, uid]
+    );
+    if (!r.rows.length) return res.status(404).json({ erro: 'Usuário não encontrado ou é admin.' });
+    res.json({
+      mensagem: bloqueado ? 'Usuário bloqueado.' : 'Usuário desbloqueado.',
+      usuario: r.rows[0]
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao alterar bloqueio.' });
+  }
+});
+
+// ── DELETE /api/admin/usuarios/:id ───────────────────────────────
+// Remove um usuário e todos seus dados (CASCADE no banco)
+router.delete('/usuarios/:id', autenticarAdmin, async (req, res) => {
+  const uid = parseInt(req.params.id);
+  if (uid === req.usuario.id)
+    return res.status(400).json({ erro: 'Você não pode remover a si mesmo.' });
+
+  try {
+    const r = await pool.query(
+      `DELETE FROM usuarios WHERE id=$1 AND perfil != 'admin' RETURNING id, nome`,
+      [uid]
+    );
+    if (!r.rows.length) return res.status(404).json({ erro: 'Usuário não encontrado ou é admin.' });
+    res.json({ mensagem: `Usuário "${r.rows[0].nome}" removido.` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao remover usuário.' });
+  }
+});
+
+// ── GET /api/admin/stats ──────────────────────────────────────────
+// Estatísticas gerais do sistema
+router.get('/stats', autenticarAdmin, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT
+        COUNT(*)                                                       AS total,
+        COUNT(*) FILTER (WHERE perfil='user')                         AS users,
+        COUNT(*) FILTER (WHERE bloqueado)                             AS bloqueados,
+        COUNT(*) FILTER (WHERE licenca_ate IS NULL AND perfil='user') AS sem_licenca,
+        COUNT(*) FILTER (WHERE licenca_ate < CURRENT_DATE AND NOT bloqueado AND perfil='user') AS expiradas,
+        COUNT(*) FILTER (WHERE licenca_ate >= CURRENT_DATE AND NOT bloqueado AND perfil='user') AS ativas
+      FROM usuarios
+    `);
+    res.json(r.rows[0]);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao buscar estatísticas.' });
+  }
+});
+
+module.exports = router;

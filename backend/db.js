@@ -1,180 +1,154 @@
-const { Pool } = require('pg');
+const express = require('express');
+const { pool } = require('../db');
+const { autenticar } = require('../middleware');
+const router = express.Router();
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+// ── Receitas normais ──────────────────────────────────────────────
+// ?todos=1  → lista todas (sem filtro de mês) — usado nas páginas de gestão
+// ?mes=&ano= → filtra por mês/ano — usado pelo dashboard
+router.get('/', autenticar, async (req, res) => {
+  const uid = req.usuario.id;
+  try {
+    let result;
+    if (req.query.todos === '1') {
+      result = await pool.query(
+        `SELECT * FROM receitas WHERE usuario_id=$1 ORDER BY ano DESC, mes DESC, criado_em DESC`,
+        [uid]
+      );
+    } else {
+      const mes = parseInt(req.query.mes) || new Date().getMonth() + 1;
+      const ano = parseInt(req.query.ano) || new Date().getFullYear();
+      result = await pool.query(
+        `SELECT * FROM receitas WHERE usuario_id=$1 AND mes=$2 AND ano=$3 ORDER BY criado_em DESC`,
+        [uid, mes, ano]
+      );
+    }
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao buscar receitas.' });
+  }
 });
 
-const CAT_RECEITAS_DEFAULT = [
-  'Salário', 'Freelance / Bico', 'Aluguel recebido',
-  'Investimentos', 'Pensão / Benefício', 'Presente / Doação', 'Outros'
-];
-const CAT_DESPESAS_DEFAULT = [
-  'Moradia', 'Alimentação', 'Transporte', 'Saúde',
-  'Educação', 'Lazer', 'Assinaturas', 'Fatura Cartão',
-  'Serviços', 'Vestuário', 'Higiene / Beleza', 'Outros'
-];
-const TIPOS_DESPESAS_DEFAULT = [
-  { nome: 'Fixa',     codigo: 'fixo' },
-  { nome: 'Variável', codigo: 'variavel' },
-  { nome: 'Fatura',   codigo: 'fatura' }
-];
-
-async function initDB() {
-  const client = await pool.connect();
+// Adicionar
+router.post('/', autenticar, async (req, res) => {
+  const { descricao, valor, categoria, tipo, mes, ano } = req.body;
+  if (!descricao || !valor || !categoria || !mes || !ano)
+    return res.status(400).json({ erro: 'Preencha todos os campos.' });
+  const tipoFinal = ['fixo','unico'].includes(tipo) ? tipo : 'unico';
   try {
-    // ── Tabelas principais ────────────────────────────────────────
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS usuarios (
-        id           SERIAL PRIMARY KEY,
-        nome         VARCHAR(100) NOT NULL,
-        email        VARCHAR(150) UNIQUE NOT NULL,
-        senha        VARCHAR(255) NOT NULL,
-        foto_url     TEXT DEFAULT NULL,
-        perfil       VARCHAR(20) NOT NULL DEFAULT 'user',
-        licenca_ate  DATE DEFAULT NULL,
-        bloqueado    BOOLEAN NOT NULL DEFAULT false,
-        criado_em    TIMESTAMP DEFAULT NOW()
-      );
-
-      CREATE TABLE IF NOT EXISTS receitas (
-        id         SERIAL PRIMARY KEY,
-        usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-        descricao  VARCHAR(200) NOT NULL,
-        valor      DECIMAL(10,2) NOT NULL,
-        categoria  VARCHAR(100) NOT NULL,
-        tipo       VARCHAR(20) NOT NULL DEFAULT 'unico',
-        mes        INTEGER NOT NULL,
-        ano        INTEGER NOT NULL,
-        criado_em  TIMESTAMP DEFAULT NOW()
-      );
-
-      CREATE TABLE IF NOT EXISTS receitas_parceladas (
-        id             SERIAL PRIMARY KEY,
-        usuario_id     INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-        descricao      VARCHAR(200) NOT NULL,
-        valor_total    DECIMAL(10,2) NOT NULL,
-        valor_parcela  DECIMAL(10,2) NOT NULL,
-        total_parcelas INTEGER NOT NULL,
-        parcela_atual  INTEGER NOT NULL DEFAULT 1,
-        mes_inicio     INTEGER NOT NULL,
-        ano_inicio     INTEGER NOT NULL,
-        categoria      VARCHAR(100) NOT NULL DEFAULT 'Outros',
-        criado_em      TIMESTAMP DEFAULT NOW()
-      );
-
-      CREATE TABLE IF NOT EXISTS despesas (
-        id         SERIAL PRIMARY KEY,
-        usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-        descricao  VARCHAR(200) NOT NULL,
-        valor      DECIMAL(10,2) NOT NULL,
-        categoria  VARCHAR(100) NOT NULL,
-        tipo       VARCHAR(50) NOT NULL DEFAULT 'fixo',
-        mes        INTEGER NOT NULL,
-        ano        INTEGER NOT NULL,
-        pago       BOOLEAN DEFAULT false,
-        criado_em  TIMESTAMP DEFAULT NOW()
-      );
-
-      CREATE TABLE IF NOT EXISTS parcelamentos (
-        id             SERIAL PRIMARY KEY,
-        usuario_id     INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-        descricao      VARCHAR(200) NOT NULL,
-        valor_total    DECIMAL(10,2) NOT NULL,
-        valor_parcela  DECIMAL(10,2) NOT NULL,
-        total_parcelas INTEGER NOT NULL,
-        parcela_atual  INTEGER NOT NULL DEFAULT 1,
-        mes_inicio     INTEGER NOT NULL,
-        ano_inicio     INTEGER NOT NULL,
-        categoria      VARCHAR(100) NOT NULL DEFAULT 'Outros',
-        criado_em      TIMESTAMP DEFAULT NOW()
-      );
-
-      CREATE TABLE IF NOT EXISTS categorias_receitas (
-        id         SERIAL PRIMARY KEY,
-        usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-        nome       VARCHAR(100) NOT NULL,
-        ativa      BOOLEAN DEFAULT true,
-        criado_em  TIMESTAMP DEFAULT NOW(),
-        UNIQUE(usuario_id, nome)
-      );
-
-      CREATE TABLE IF NOT EXISTS categorias_despesas (
-        id         SERIAL PRIMARY KEY,
-        usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-        nome       VARCHAR(100) NOT NULL,
-        ativa      BOOLEAN DEFAULT true,
-        criado_em  TIMESTAMP DEFAULT NOW(),
-        UNIQUE(usuario_id, nome)
-      );
-
-      CREATE TABLE IF NOT EXISTS tipos_despesas (
-        id         SERIAL PRIMARY KEY,
-        usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-        nome       VARCHAR(100) NOT NULL,
-        codigo     VARCHAR(50) NOT NULL,
-        ativo      BOOLEAN DEFAULT true,
-        criado_em  TIMESTAMP DEFAULT NOW(),
-        UNIQUE(usuario_id, codigo)
-      );
-
-      CREATE TABLE IF NOT EXISTS backup_log (
-        id           SERIAL PRIMARY KEY,
-        usuario_id   INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-        status       VARCHAR(20) NOT NULL DEFAULT 'sucesso',
-        detalhes     TEXT,
-        realizado_em TIMESTAMP DEFAULT NOW()
-      );
-    `);
-
-    // ── Migrações seguras (colunas novas em banco existente) ──────
-    await client.query(`
-      DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='receitas' AND column_name='tipo') THEN
-          ALTER TABLE receitas ADD COLUMN tipo VARCHAR(20) NOT NULL DEFAULT 'unico';
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='foto_url') THEN
-          ALTER TABLE usuarios ADD COLUMN foto_url TEXT DEFAULT NULL;
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='perfil') THEN
-          ALTER TABLE usuarios ADD COLUMN perfil VARCHAR(20) NOT NULL DEFAULT 'user';
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='licenca_ate') THEN
-          ALTER TABLE usuarios ADD COLUMN licenca_ate DATE DEFAULT NULL;
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='bloqueado') THEN
-          ALTER TABLE usuarios ADD COLUMN bloqueado BOOLEAN NOT NULL DEFAULT false;
-        END IF;
-      END $$;
-    `);
-
-    // ── Seed categorias para usuários existentes ──────────────────
-    const usuarios = await client.query('SELECT id FROM usuarios');
-    for (const u of usuarios.rows) {
-      const uid = u.id;
-      const cR = await client.query('SELECT COUNT(*) FROM categorias_receitas WHERE usuario_id=$1', [uid]);
-      if (parseInt(cR.rows[0].count) === 0) {
-        for (const nome of CAT_RECEITAS_DEFAULT)
-          await client.query('INSERT INTO categorias_receitas(usuario_id,nome) VALUES($1,$2) ON CONFLICT DO NOTHING', [uid, nome]);
-      }
-      const cD = await client.query('SELECT COUNT(*) FROM categorias_despesas WHERE usuario_id=$1', [uid]);
-      if (parseInt(cD.rows[0].count) === 0) {
-        for (const nome of CAT_DESPESAS_DEFAULT)
-          await client.query('INSERT INTO categorias_despesas(usuario_id,nome) VALUES($1,$2) ON CONFLICT DO NOTHING', [uid, nome]);
-      }
-      const cT = await client.query('SELECT COUNT(*) FROM tipos_despesas WHERE usuario_id=$1', [uid]);
-      if (parseInt(cT.rows[0].count) === 0) {
-        for (const t of TIPOS_DESPESAS_DEFAULT)
-          await client.query('INSERT INTO tipos_despesas(usuario_id,nome,codigo) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [uid, t.nome, t.codigo]);
-      }
-    }
-
-    console.log('✅ Banco de dados inicializado com sucesso');
+    const result = await pool.query(
+      `INSERT INTO receitas (usuario_id, descricao, valor, categoria, tipo, mes, ano)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [req.usuario.id, descricao, valor, categoria, tipoFinal, mes, ano]
+    );
+    res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error('❌ Erro ao inicializar banco:', err.message);
-  } finally {
-    client.release();
+    res.status(500).json({ erro: 'Erro ao adicionar receita.' });
   }
-}
+});
 
-module.exports = { pool, initDB, CAT_RECEITAS_DEFAULT, CAT_DESPESAS_DEFAULT, TIPOS_DESPESAS_DEFAULT };
+// Editar
+router.put('/:id', autenticar, async (req, res) => {
+  const { descricao, valor, categoria, tipo, mes, ano } = req.body;
+  if (!descricao || !valor || !categoria || !mes || !ano)
+    return res.status(400).json({ erro: 'Preencha todos os campos.' });
+  const tipoFinal = ['fixo','unico'].includes(tipo) ? tipo : 'unico';
+  try {
+    const result = await pool.query(
+      `UPDATE receitas SET descricao=$1, valor=$2, categoria=$3, tipo=$4, mes=$5, ano=$6
+       WHERE id=$7 AND usuario_id=$8 RETURNING *`,
+      [descricao, valor, categoria, tipoFinal, mes, ano, req.params.id, req.usuario.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ erro: 'Receita não encontrada.' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao editar receita.' });
+  }
+});
+
+// Deletar
+router.delete('/:id', autenticar, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM receitas WHERE id=$1 AND usuario_id=$2', [req.params.id, req.usuario.id]);
+    res.json({ mensagem: 'Receita removida.' });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao deletar receita.' });
+  }
+});
+
+// ── Receitas parceladas ───────────────────────────────────────────
+router.get('/parceladas', autenticar, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT *, (total_parcelas - parcela_atual + 1) AS parcelas_restantes,
+              ((total_parcelas - parcela_atual + 1) * valor_parcela) AS valor_restante
+       FROM receitas_parceladas WHERE usuario_id=$1 AND parcela_atual <= total_parcelas
+       ORDER BY criado_em DESC`,
+      [req.usuario.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao buscar receitas parceladas.' });
+  }
+});
+
+router.post('/parceladas', autenticar, async (req, res) => {
+  const { descricao, valor_total, valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria } = req.body;
+  if (!descricao || !valor_total || !valor_parcela || !total_parcelas || !mes_inicio || !ano_inicio)
+    return res.status(400).json({ erro: 'Preencha todos os campos.' });
+  try {
+    const result = await pool.query(
+      `INSERT INTO receitas_parceladas
+       (usuario_id, descricao, valor_total, valor_parcela, total_parcelas, parcela_atual, mes_inicio, ano_inicio, categoria)
+       VALUES ($1,$2,$3,$4,$5,1,$6,$7,$8) RETURNING *`,
+      [req.usuario.id, descricao, valor_total, valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria || 'Outros']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao criar receita parcelada.' });
+  }
+});
+
+router.put('/parceladas/:id', autenticar, async (req, res) => {
+  const { descricao, valor_total, valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria } = req.body;
+  if (!descricao || !valor_parcela || !total_parcelas || !mes_inicio || !ano_inicio)
+    return res.status(400).json({ erro: 'Preencha todos os campos.' });
+  try {
+    const result = await pool.query(
+      `UPDATE receitas_parceladas SET descricao=$1, valor_total=$2, valor_parcela=$3,
+              total_parcelas=$4, mes_inicio=$5, ano_inicio=$6, categoria=$7
+       WHERE id=$8 AND usuario_id=$9 RETURNING *`,
+      [descricao, valor_total, valor_parcela, total_parcelas, mes_inicio, ano_inicio,
+       categoria || 'Outros', req.params.id, req.usuario.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ erro: 'Não encontrada.' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao editar.' });
+  }
+});
+
+router.patch('/parceladas/:id/avancar', autenticar, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE receitas_parceladas SET parcela_atual = parcela_atual + 1
+       WHERE id=$1 AND usuario_id=$2 AND parcela_atual < total_parcelas RETURNING *`,
+      [req.params.id, req.usuario.id]
+    );
+    if (!result.rows.length) return res.status(400).json({ erro: 'Já concluída ou não encontrada.' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao avançar parcela.' });
+  }
+});
+
+router.delete('/parceladas/:id', autenticar, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM receitas_parceladas WHERE id=$1 AND usuario_id=$2', [req.params.id, req.usuario.id]);
+    res.json({ mensagem: 'Removida.' });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao deletar.' });
+  }
+});
+
+module.exports = router;
