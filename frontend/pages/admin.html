@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinPessoal – Painel Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="fp-logo">FP</div>
+      <span>FinPessoal</span>
+    </div>
+    <div class="sidebar-user" id="sidebarUser"></div>
+    <nav class="sidebar-nav">
+      <a href="admin.html" class="nav-item active">👑 Painel Admin</a>
+    </nav>
+    <button class="btn-sair" onclick="sairAdmin()">🚪 Sair</button>
+  </div>
+  <div class="overlay" id="overlay" onclick="fecharMenuAdmin()"></div>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="menu-toggle" onclick="toggleMenuAdmin()">☰</button>
+      <div class="topbar-info">
+        <span id="saudacao">Painel Admin</span>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <h1 class="page-title">👑 Painel de Administração</h1>
+
+      <!-- CARDS DE ESTATÍSTICAS -->
+      <div class="cards-grid" id="statsCards">
+        <div class="card card-receita">
+          <div class="card-label">Total de Usuários</div>
+          <div class="card-valor" id="statTotal">–</div>
+          <div class="card-icon">👥</div>
+        </div>
+        <div class="card card-saldo">
+          <div class="card-label">Licenças Ativas</div>
+          <div class="card-valor" id="statAtivas">–</div>
+          <div class="card-icon">✅</div>
+        </div>
+        <div class="card card-parcela">
+          <div class="card-label">Licenças Expiradas</div>
+          <div class="card-valor" id="statExpiradas">–</div>
+          <div class="card-icon">⏰</div>
+        </div>
+        <div class="card card-despesa">
+          <div class="card-label">Bloqueados</div>
+          <div class="card-valor" id="statBloqueados">–</div>
+          <div class="card-icon">🚫</div>
+        </div>
+      </div>
+
+      <!-- FILTRO / BUSCA -->
+      <div class="admin-toolbar">
+        <input type="text" id="buscaUsuario" placeholder="🔍 Buscar por nome ou e-mail..." oninput="filtrarTabela()" />
+        <select id="filtroSituacao" onchange="filtrarTabela()">
+          <option value="">Todos</option>
+          <option value="ativa">Licença ativa</option>
+          <option value="expirada">Licença expirada</option>
+          <option value="expirando">Expirando em breve</option>
+          <option value="sem_licenca">Sem licença</option>
+          <option value="bloqueado">Bloqueados</option>
+        </select>
+        <button class="btn-primario btn-sm" onclick="carregarUsuarios()">🔄 Atualizar</button>
+      </div>
+
+      <!-- TABELA DE USUÁRIOS -->
+      <div class="tabela-wrapper">
+        <div class="tabela-titulo">Gerenciamento de Usuários</div>
+        <div class="tabela-scroll">
+          <table id="tabelaUsuarios">
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>E-mail</th>
+                <th>Tipo</th>
+                <th>Situação</th>
+                <th>Licença até</th>
+                <th>Dias</th>
+                <th>Cadastro</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="corpoTabela">
+              <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GERENCIAR LICENÇA -->
+  <div class="modal-overlay hidden" id="modalLicenca">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🗓️ Gerenciar Licença</h3>
+        <button onclick="fecharModalLicenca()" class="btn-fechar">✕</button>
+      </div>
+      <div id="erroLicenca" class="alerta alerta-erro hidden"></div>
+
+      <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px">
+        Usuário: <strong id="licNome">–</strong>
+      </p>
+
+      <div class="admin-lic-tabs">
+        <button class="admin-lic-tab active" onclick="trocarTabLic('dias',this)">Por dias</button>
+        <button class="admin-lic-tab" onclick="trocarTabLic('data',this)">Por data</button>
+      </div>
+
+      <!-- Aba: por dias -->
+      <div id="tabDias">
+        <div class="admin-lic-presets">
+          <button onclick="setDias(7)">7 dias</button>
+          <button onclick="setDias(15)">15 dias</button>
+          <button onclick="setDias(30)">30 dias</button>
+          <button onclick="setDias(60)">60 dias</button>
+          <button onclick="setDias(90)">90 dias</button>
+          <button onclick="setDias(180)">6 meses</button>
+          <button onclick="setDias(365)">1 ano</button>
+        </div>
+        <div class="campo">
+          <label>Ou digite os dias</label>
+          <input type="number" id="inputDias" placeholder="Ex: 45" min="1" max="3650" />
+        </div>
+      </div>
+
+      <!-- Aba: por data -->
+      <div id="tabData" style="display:none">
+        <div class="campo">
+          <label>Data de expiração</label>
+          <input type="date" id="inputData" />
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn-primario" onclick="salvarLicenca()" style="flex:1;margin-top:0">💾 Salvar</button>
+        <button class="btn-primario btn-danger" onclick="removerLicenca()" style="flex:1;margin-top:0" title="Remove a licença (usuário fica sem acesso)">❌ Remover licença</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR AÇÃO -->
+  <div class="modal-overlay hidden" id="modalConfirm">
+    <div class="modal" style="max-width:380px">
+      <div class="modal-header">
+        <h3 id="confirmTitulo">Confirmar</h3>
+        <button onclick="fecharConfirm()" class="btn-fechar">✕</button>
+      </div>
+      <p id="confirmMsg" style="font-size:14px;color:var(--text-muted);margin-bottom:20px"></p>
+      <div style="display:flex;gap:10px">
+        <button class="btn-primario btn-danger" onclick="executarConfirm()" style="flex:1;margin-top:0" id="btnConfirm">Confirmar</button>
+        <button class="btn-primario" onclick="fecharConfirm()" style="flex:1;margin-top:0;background:var(--text-muted)">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/admin.js"></script>
+</body>
+</html>

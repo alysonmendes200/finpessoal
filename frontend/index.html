@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinPessoal – Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="auth-body">
+
+  <div class="auth-container">
+    <div class="auth-brand">
+      <div class="brand-icon-fp">FP</div>
+      <h1 class="brand-name">FinPessoal</h1>
+      <p class="brand-tagline">Seu dinheiro, sob controle.</p>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="auth-card" id="formLogin">
+      <h2>Entrar na sua conta</h2>
+      <div id="erroLogin" class="alerta alerta-erro hidden"></div>
+      <div class="campo">
+        <label>E-mail</label>
+        <input type="email" id="loginEmail" placeholder="seu@email.com" />
+      </div>
+      <div class="campo">
+        <label>Senha</label>
+        <input type="password" id="loginSenha" placeholder="••••••••" />
+      </div>
+      <button class="btn-primario" onclick="fazerLogin()">Entrar</button>
+      <p class="auth-link">Não tem conta? <a href="#" onclick="alternarForm()">Cadastre-se grátis</a></p>
+    </div>
+
+    <!-- CADASTRO -->
+    <div class="auth-card hidden" id="formCadastro">
+      <h2>Criar conta</h2>
+      <div id="erroCadastro" class="alerta alerta-erro hidden"></div>
+      <div id="sucessoCadastro" class="alerta alerta-sucesso hidden"></div>
+      <div class="campo">
+        <label>Nome completo</label>
+        <input type="text" id="cadNome" placeholder="Seu nome" />
+      </div>
+      <div class="campo">
+        <label>E-mail</label>
+        <input type="email" id="cadEmail" placeholder="seu@email.com" />
+      </div>
+      <div class="campo">
+        <label>Senha</label>
+        <input type="password" id="cadSenha" placeholder="Mínimo 6 caracteres" />
+      </div>
+      <button class="btn-primario" onclick="fazerCadastro()">Criar conta</button>
+      <p class="auth-link">Já tem conta? <a href="#" onclick="alternarForm()">Fazer login</a></p>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>
