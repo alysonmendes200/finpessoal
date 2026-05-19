@@ -5,7 +5,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// ── Defaults de seed ─────────────────────────────────────────────
 const CAT_RECEITAS_DEFAULT = [
   'Salário', 'Freelance / Bico', 'Aluguel recebido',
   'Investimentos', 'Pensão / Benefício', 'Presente / Doação', 'Outros'
@@ -27,12 +26,15 @@ async function initDB() {
     // ── Tabelas principais ────────────────────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
-        id        SERIAL PRIMARY KEY,
-        nome      VARCHAR(100) NOT NULL,
-        email     VARCHAR(150) UNIQUE NOT NULL,
-        senha     VARCHAR(255) NOT NULL,
-        foto_url  TEXT DEFAULT NULL,
-        criado_em TIMESTAMP DEFAULT NOW()
+        id           SERIAL PRIMARY KEY,
+        nome         VARCHAR(100) NOT NULL,
+        email        VARCHAR(150) UNIQUE NOT NULL,
+        senha        VARCHAR(255) NOT NULL,
+        foto_url     TEXT DEFAULT NULL,
+        perfil       VARCHAR(20) NOT NULL DEFAULT 'user',
+        licenca_ate  DATE DEFAULT NULL,
+        bloqueado    BOOLEAN NOT NULL DEFAULT false,
+        criado_em    TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS receitas (
@@ -125,48 +127,45 @@ async function initDB() {
       );
     `);
 
-    // ── Migrações seguras ─────────────────────────────────────────
+    // ── Migrações seguras (colunas novas em banco existente) ──────
     await client.query(`
       DO $$ BEGIN
-        -- Adiciona tipo em receitas (legado)
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_name='receitas' AND column_name='tipo'
-        ) THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='receitas' AND column_name='tipo') THEN
           ALTER TABLE receitas ADD COLUMN tipo VARCHAR(20) NOT NULL DEFAULT 'unico';
         END IF;
-
-        -- Adiciona foto_url em usuários (nova)
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_name='usuarios' AND column_name='foto_url'
-        ) THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='foto_url') THEN
           ALTER TABLE usuarios ADD COLUMN foto_url TEXT DEFAULT NULL;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='perfil') THEN
+          ALTER TABLE usuarios ADD COLUMN perfil VARCHAR(20) NOT NULL DEFAULT 'user';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='licenca_ate') THEN
+          ALTER TABLE usuarios ADD COLUMN licenca_ate DATE DEFAULT NULL;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='bloqueado') THEN
+          ALTER TABLE usuarios ADD COLUMN bloqueado BOOLEAN NOT NULL DEFAULT false;
         END IF;
       END $$;
     `);
 
-    // ── Seed por usuário existente (idempotente) ──────────────────
+    // ── Seed categorias para usuários existentes ──────────────────
     const usuarios = await client.query('SELECT id FROM usuarios');
     for (const u of usuarios.rows) {
       const uid = u.id;
-
-      const cR = await client.query('SELECT COUNT(*) FROM categorias_receitas WHERE usuario_id=$1',[uid]);
+      const cR = await client.query('SELECT COUNT(*) FROM categorias_receitas WHERE usuario_id=$1', [uid]);
       if (parseInt(cR.rows[0].count) === 0) {
         for (const nome of CAT_RECEITAS_DEFAULT)
-          await client.query('INSERT INTO categorias_receitas(usuario_id,nome) VALUES($1,$2) ON CONFLICT DO NOTHING',[uid,nome]);
+          await client.query('INSERT INTO categorias_receitas(usuario_id,nome) VALUES($1,$2) ON CONFLICT DO NOTHING', [uid, nome]);
       }
-
-      const cD = await client.query('SELECT COUNT(*) FROM categorias_despesas WHERE usuario_id=$1',[uid]);
+      const cD = await client.query('SELECT COUNT(*) FROM categorias_despesas WHERE usuario_id=$1', [uid]);
       if (parseInt(cD.rows[0].count) === 0) {
         for (const nome of CAT_DESPESAS_DEFAULT)
-          await client.query('INSERT INTO categorias_despesas(usuario_id,nome) VALUES($1,$2) ON CONFLICT DO NOTHING',[uid,nome]);
+          await client.query('INSERT INTO categorias_despesas(usuario_id,nome) VALUES($1,$2) ON CONFLICT DO NOTHING', [uid, nome]);
       }
-
-      const cT = await client.query('SELECT COUNT(*) FROM tipos_despesas WHERE usuario_id=$1',[uid]);
+      const cT = await client.query('SELECT COUNT(*) FROM tipos_despesas WHERE usuario_id=$1', [uid]);
       if (parseInt(cT.rows[0].count) === 0) {
         for (const t of TIPOS_DESPESAS_DEFAULT)
-          await client.query('INSERT INTO tipos_despesas(usuario_id,nome,codigo) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[uid,t.nome,t.codigo]);
+          await client.query('INSERT INTO tipos_despesas(usuario_id,nome,codigo) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [uid, t.nome, t.codigo]);
       }
     }
 
