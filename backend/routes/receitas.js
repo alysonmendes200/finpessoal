@@ -4,28 +4,36 @@ const { autenticar } = require('../middleware');
 const router = express.Router();
 
 // ── Receitas normais ──────────────────────────────────────────────
-
+// ?todos=1  → lista todas (sem filtro de mês) — usado nas páginas de gestão
+// ?mes=&ano= → filtra por mês/ano — usado pelo dashboard
 router.get('/', autenticar, async (req, res) => {
-  const mesAtual = parseInt(req.query.mes) || new Date().getMonth() + 1;
-  const anoAtual = parseInt(req.query.ano) || new Date().getFullYear();
+  const uid = req.usuario.id;
   try {
-    const result = await pool.query(
-      `SELECT * FROM receitas
-       WHERE usuario_id=$1 AND mes=$2 AND ano=$3
-       ORDER BY criado_em DESC`,
-      [req.usuario.id, mesAtual, anoAtual]
-    );
+    let result;
+    if (req.query.todos === '1') {
+      result = await pool.query(
+        `SELECT * FROM receitas WHERE usuario_id=$1 ORDER BY ano DESC, mes DESC, criado_em DESC`,
+        [uid]
+      );
+    } else {
+      const mes = parseInt(req.query.mes) || new Date().getMonth() + 1;
+      const ano = parseInt(req.query.ano) || new Date().getFullYear();
+      result = await pool.query(
+        `SELECT * FROM receitas WHERE usuario_id=$1 AND mes=$2 AND ano=$3 ORDER BY criado_em DESC`,
+        [uid, mes, ano]
+      );
+    }
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao buscar receitas.' });
   }
 });
 
+// Adicionar
 router.post('/', autenticar, async (req, res) => {
   const { descricao, valor, categoria, tipo, mes, ano } = req.body;
-  if (!descricao || !valor || !categoria || !mes || !ano) {
+  if (!descricao || !valor || !categoria || !mes || !ano)
     return res.status(400).json({ erro: 'Preencha todos os campos.' });
-  }
   const tipoFinal = ['fixo','unico'].includes(tipo) ? tipo : 'unico';
   try {
     const result = await pool.query(
@@ -39,34 +47,29 @@ router.post('/', autenticar, async (req, res) => {
   }
 });
 
-// ── EDITAR receita ────────────────────────────────────────────────
+// Editar
 router.put('/:id', autenticar, async (req, res) => {
   const { descricao, valor, categoria, tipo, mes, ano } = req.body;
-  if (!descricao || !valor || !categoria || !mes || !ano) {
+  if (!descricao || !valor || !categoria || !mes || !ano)
     return res.status(400).json({ erro: 'Preencha todos os campos.' });
-  }
   const tipoFinal = ['fixo','unico'].includes(tipo) ? tipo : 'unico';
   try {
     const result = await pool.query(
-      `UPDATE receitas
-       SET descricao=$1, valor=$2, categoria=$3, tipo=$4, mes=$5, ano=$6
-       WHERE id=$7 AND usuario_id=$8
-       RETURNING *`,
+      `UPDATE receitas SET descricao=$1, valor=$2, categoria=$3, tipo=$4, mes=$5, ano=$6
+       WHERE id=$7 AND usuario_id=$8 RETURNING *`,
       [descricao, valor, categoria, tipoFinal, mes, ano, req.params.id, req.usuario.id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ erro: 'Receita não encontrada.' });
+    if (!result.rows.length) return res.status(404).json({ erro: 'Receita não encontrada.' });
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao editar receita.' });
   }
 });
 
+// Deletar
 router.delete('/:id', autenticar, async (req, res) => {
   try {
-    await pool.query(
-      'DELETE FROM receitas WHERE id=$1 AND usuario_id=$2',
-      [req.params.id, req.usuario.id]
-    );
+    await pool.query('DELETE FROM receitas WHERE id=$1 AND usuario_id=$2', [req.params.id, req.usuario.id]);
     res.json({ mensagem: 'Receita removida.' });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao deletar receita.' });
@@ -74,15 +77,12 @@ router.delete('/:id', autenticar, async (req, res) => {
 });
 
 // ── Receitas parceladas ───────────────────────────────────────────
-
 router.get('/parceladas', autenticar, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT *,
-         (total_parcelas - parcela_atual + 1) AS parcelas_restantes,
-         ((total_parcelas - parcela_atual + 1) * valor_parcela) AS valor_restante
-       FROM receitas_parceladas
-       WHERE usuario_id=$1 AND parcela_atual <= total_parcelas
+      `SELECT *, (total_parcelas - parcela_atual + 1) AS parcelas_restantes,
+              ((total_parcelas - parcela_atual + 1) * valor_parcela) AS valor_restante
+       FROM receitas_parceladas WHERE usuario_id=$1 AND parcela_atual <= total_parcelas
        ORDER BY criado_em DESC`,
       [req.usuario.id]
     );
@@ -94,15 +94,14 @@ router.get('/parceladas', autenticar, async (req, res) => {
 
 router.post('/parceladas', autenticar, async (req, res) => {
   const { descricao, valor_total, valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria } = req.body;
-  if (!descricao || !valor_total || !valor_parcela || !total_parcelas || !mes_inicio || !ano_inicio) {
+  if (!descricao || !valor_total || !valor_parcela || !total_parcelas || !mes_inicio || !ano_inicio)
     return res.status(400).json({ erro: 'Preencha todos os campos.' });
-  }
   try {
     const result = await pool.query(
       `INSERT INTO receitas_parceladas
        (usuario_id, descricao, valor_total, valor_parcela, total_parcelas, parcela_atual, mes_inicio, ano_inicio, categoria)
        VALUES ($1,$2,$3,$4,$5,1,$6,$7,$8) RETURNING *`,
-      [req.usuario.id, descricao, valor_total, valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria || 'outros']
+      [req.usuario.id, descricao, valor_total, valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria || 'Outros']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -110,24 +109,19 @@ router.post('/parceladas', autenticar, async (req, res) => {
   }
 });
 
-// ── EDITAR receita parcelada ──────────────────────────────────────
 router.put('/parceladas/:id', autenticar, async (req, res) => {
   const { descricao, valor_total, valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria } = req.body;
-  if (!descricao || !valor_parcela || !total_parcelas || !mes_inicio || !ano_inicio) {
+  if (!descricao || !valor_parcela || !total_parcelas || !mes_inicio || !ano_inicio)
     return res.status(400).json({ erro: 'Preencha todos os campos.' });
-  }
   try {
     const result = await pool.query(
-      `UPDATE receitas_parceladas
-       SET descricao=$1, valor_total=$2, valor_parcela=$3, total_parcelas=$4,
-           mes_inicio=$5, ano_inicio=$6, categoria=$7
-       WHERE id=$8 AND usuario_id=$9
-       RETURNING *`,
-      [descricao, valor_total, valor_parcela, total_parcelas,
-       mes_inicio, ano_inicio, categoria || 'outros',
-       req.params.id, req.usuario.id]
+      `UPDATE receitas_parceladas SET descricao=$1, valor_total=$2, valor_parcela=$3,
+              total_parcelas=$4, mes_inicio=$5, ano_inicio=$6, categoria=$7
+       WHERE id=$8 AND usuario_id=$9 RETURNING *`,
+      [descricao, valor_total, valor_parcela, total_parcelas, mes_inicio, ano_inicio,
+       categoria || 'Outros', req.params.id, req.usuario.id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ erro: 'Não encontrada.' });
+    if (!result.rows.length) return res.status(404).json({ erro: 'Não encontrada.' });
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao editar.' });
@@ -141,7 +135,7 @@ router.patch('/parceladas/:id/avancar', autenticar, async (req, res) => {
        WHERE id=$1 AND usuario_id=$2 AND parcela_atual < total_parcelas RETURNING *`,
       [req.params.id, req.usuario.id]
     );
-    if (result.rows.length === 0) return res.status(400).json({ erro: 'Já concluída ou não encontrada.' });
+    if (!result.rows.length) return res.status(400).json({ erro: 'Já concluída ou não encontrada.' });
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao avançar parcela.' });
@@ -150,10 +144,7 @@ router.patch('/parceladas/:id/avancar', autenticar, async (req, res) => {
 
 router.delete('/parceladas/:id', autenticar, async (req, res) => {
   try {
-    await pool.query(
-      'DELETE FROM receitas_parceladas WHERE id=$1 AND usuario_id=$2',
-      [req.params.id, req.usuario.id]
-    );
+    await pool.query('DELETE FROM receitas_parceladas WHERE id=$1 AND usuario_id=$2', [req.params.id, req.usuario.id]);
     res.json({ mensagem: 'Removida.' });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao deletar.' });
