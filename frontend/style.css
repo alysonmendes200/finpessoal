@@ -1,150 +1,233 @@
-// ===== FINPESSOAL – PARCELAMENTOS JS v5 =====
+// ===== FINPESSOAL – PAINEL ADMIN =====
 
-let todosParcelamentos = [];
-let editandoId         = null;
+let _usuarios    = [];  // cache completo
+let _filtrados   = [];  // após filtros
+let _uidLicenca  = null;
+let _tabLicenca  = 'dias';
+let _uidConfirm  = null;
+let _acaoConfirm = null;
 
+// ── Inicialização ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  await carregarConfiguracoes();
-  renderizarSidebarMesSel(null);
-  await popularSelectsParcelamentos();
-  await carregarParcelamentos();
+  // Verifica autenticação e perfil admin
+  const token   = getToken();
+  const usuario = getUsuario();
+  if (!token || !usuario) { window.location.href = '/'; return; }
+  if (usuario.perfil !== 'admin') { window.location.href = '/pages/dashboard.html'; return; }
+
+  // Exibe nome do admin na sidebar
+  const sidebarUser = document.getElementById('sidebarUser');
+  if (sidebarUser) {
+    const ini = usuario.nome.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();
+    sidebarUser.innerHTML = `
+      <div class="sidebar-avatar">${ini}</div>
+      <div class="sidebar-user-info">
+        <div class="sidebar-user-nome">${usuario.nome}</div>
+        <div class="sidebar-user-email">Administrador</div>
+      </div>`;
+  }
+
+  await carregarUsuarios();
 });
 
-async function popularSelectsParcelamentos() {
-  const cats = _catsDespesas.length ? _catsDespesas : await buscarCatsDespesas();
-  const sel  = document.getElementById('parCategoria');
-  if (sel) sel.innerHTML = cats.length
-    ? cats.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('')
-    : '<option>Sem categorias</option>';
-}
-async function buscarCatsDespesas() {
-  const r = await apiGet('/configuracoes/categorias-despesas');
-  return r?.ok ? r.data : [];
+// ── Carregar dados ────────────────────────────────────────────────
+async function carregarUsuarios() {
+  const [statsResp, usersResp] = await Promise.all([
+    apiGet('/admin/stats'),
+    apiGet('/admin/usuarios')
+  ]);
+
+  if (statsResp?.ok) {
+    const s = statsResp.data;
+    document.getElementById('statTotal').textContent      = s.users      || 0;
+    document.getElementById('statAtivas').textContent     = s.ativas     || 0;
+    document.getElementById('statExpiradas').textContent  = s.expiradas  || 0;
+    document.getElementById('statBloqueados').textContent = s.bloqueados || 0;
+  }
+
+  if (usersResp?.ok) {
+    _usuarios = usersResp.data;
+    filtrarTabela();
+  }
 }
 
-async function carregarParcelamentos() {
-  const resp = await apiGet('/parcelamentos');
-  if (!resp || !resp.ok) return;
-  todosParcelamentos = resp.data;
-  renderParcelamentos(todosParcelamentos);
-  const total = todosParcelamentos.reduce((s, p) => s + parseFloat(p.valor_parcela), 0);
-  const el = document.getElementById('totalParcelas');
-  if (el) el.textContent = formatarMoeda(total);
+// ── Filtro da tabela ──────────────────────────────────────────────
+function filtrarTabela() {
+  const busca     = document.getElementById('buscaUsuario').value.toLowerCase();
+  const situacao  = document.getElementById('filtroSituacao').value;
+
+  _filtrados = _usuarios.filter(u => {
+    const matchBusca = !busca || u.nome.toLowerCase().includes(busca) || u.email.toLowerCase().includes(busca);
+    const matchSit   = !situacao || u.situacao === situacao;
+    return matchBusca && matchSit;
+  });
+
+  renderTabela(_filtrados);
 }
 
-function renderParcelamentos(lista) {
-  const el = document.getElementById('listaParcelamentos');
-  if (!lista || !lista.length) {
-    el.innerHTML = '<p class="lista-vazia">Nenhum parcelamento ativo.</p>';
+// ── Render tabela ─────────────────────────────────────────────────
+function renderTabela(lista) {
+  const tbody = document.getElementById('corpoTabela');
+
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Nenhum usuário encontrado.</td></tr>';
     return;
   }
-  el.innerHTML = lista.map(p => {
-    const pct       = Math.min(((p.parcela_atual - 1) / p.total_parcelas) * 100, 100);
-    const restantes = p.total_parcelas - p.parcela_atual + 1;
-    return `
-    <div class="item-card">
-      <div class="item-emoji">${emojiCat(p.categoria)}</div>
-      <div class="item-info">
-        <div class="item-desc">${p.descricao}</div>
-        <div class="item-sub">
-          Parcela ${p.parcela_atual}/${p.total_parcelas}
-          · ${restantes} restante${restantes !== 1 ? 's' : ''}
-          · Saldo: ${formatarMoeda(p.valor_restante)}
+
+  tbody.innerHTML = lista.map(u => {
+    const sit   = situacaoBadge(u.situacao);
+    const dtLic = u.licenca_ate ? new Date(u.licenca_ate).toLocaleDateString('pt-BR') : '–';
+    const dias  = u.dias_licenca !== null
+      ? (u.dias_licenca >= 0 ? `+${u.dias_licenca}d` : `${u.dias_licenca}d`)
+      : '–';
+    const dtCad = new Date(u.criado_em).toLocaleDateString('pt-BR');
+
+    const btnBloquear = u.bloqueado
+      ? `<button class="btn-acao success" onclick="confirmarAcao(${u.id},'desbloquear','${esc(u.nome)}')" title="Desbloquear">🔓</button>`
+      : `<button class="btn-acao danger"  onclick="confirmarAcao(${u.id},'bloquear','${esc(u.nome)}')"   title="Bloquear">🔒</button>`;
+
+    return `<tr>
+      <td><strong>${esc(u.nome)}</strong></td>
+      <td style="color:var(--text-muted)">${esc(u.email)}</td>
+      <td>${u.perfil === 'admin' ? '<span class="badge" style="background:#fef9c3;color:#854d0e">Admin</span>' : '<span class="badge badge-fixo">User</span>'}</td>
+      <td>${sit}</td>
+      <td>${dtLic}</td>
+      <td style="${u.dias_licenca !== null && u.dias_licenca < 0 ? 'color:var(--red)' : u.dias_licenca !== null && u.dias_licenca <= 7 ? 'color:var(--amber)' : ''}">${dias}</td>
+      <td style="color:var(--text-muted)">${dtCad}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn-acao" onclick="abrirLicenca(${u.id},'${esc(u.nome)}')" title="Licença">🗓️</button>
+          ${u.perfil !== 'admin' ? btnBloquear : ''}
+          ${u.perfil !== 'admin' ? `<button class="btn-acao danger" onclick="confirmarAcao(${u.id},'excluir','${esc(u.nome)}')" title="Excluir">🗑️</button>` : ''}
         </div>
-        <div class="parcela-progresso"><div class="parcela-fill" style="width:${pct.toFixed(1)}%"></div></div>
-      </div>
-      <div class="item-valor item-valor-parc">
-        ${formatarMoeda(p.valor_parcela)}<span class="item-unidade">/mês</span>
-      </div>
-      <div class="item-acoes">
-        <button class="btn-acao success" onclick="avancarParcela(${p.id})"      title="Paga">✅</button>
-        <button class="btn-acao"         onclick="abrirEdicao(${p.id})"         title="Editar">✏️</button>
-        <button class="btn-acao danger"  onclick="deletarParcelamento(${p.id})" title="Excluir">🗑️</button>
-      </div>
-    </div>`;
+      </td>
+    </tr>`;
   }).join('');
 }
 
-async function avancarParcela(id) {
-  if (!confirm('Marcar parcela atual como paga e avançar?')) return;
-  const resp = await apiPatch(`/parcelamentos/${id}/avancar`, {});
-  if (resp?.ok) carregarParcelamentos();
-  else alert(resp?.data?.erro || 'Erro.');
-}
-async function deletarParcelamento(id) {
-  if (!confirm('Remover este parcelamento?')) return;
-  const resp = await apiDelete(`/parcelamentos/${id}`);
-  if (resp?.ok) carregarParcelamentos();
-}
+function esc(str) { return (str||'').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
 
-function calcularParcela() {
-  const t = parseFloat(document.getElementById('parValorTotal').value);
-  const n = parseInt(document.getElementById('parTotalParcelas').value);
-  if (t > 0 && n > 0) document.getElementById('parValorParcela').value = (t / n).toFixed(2);
-}
-
-function abrirModal() {
-  editandoId = null;
-  document.getElementById('modalTitulo').textContent = 'Novo Parcelamento';
-  document.getElementById('erroModal').classList.add('hidden');
-  ['parDescricao','parValorTotal','parTotalParcelas','parValorParcela'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  const sel = document.getElementById('parCategoria');
-  if (sel?.options.length) sel.selectedIndex = 0;
-  const agora = new Date();
-  preencherMesAno('parMesInicio', 'parAnoInicio', agora.getMonth() + 1, agora.getFullYear());
-  document.getElementById('modalOverlay').classList.remove('hidden');
-}
-
-function abrirEdicao(id) {
-  const p = todosParcelamentos.find(x => x.id === id);
-  if (!p) return;
-  editandoId = id;
-  document.getElementById('modalTitulo').textContent = 'Editar Parcelamento';
-  document.getElementById('erroModal').classList.add('hidden');
-  document.getElementById('parDescricao').value     = p.descricao;
-  document.getElementById('parValorTotal').value    = p.valor_total;
-  document.getElementById('parTotalParcelas').value = p.total_parcelas;
-  document.getElementById('parValorParcela').value  = p.valor_parcela;
-  const sel = document.getElementById('parCategoria');
-  if (sel) sel.value = p.categoria;
-  preencherMesAno('parMesInicio', 'parAnoInicio', p.mes_inicio, p.ano_inicio);
-  document.getElementById('modalOverlay').classList.remove('hidden');
-}
-
-function fecharModal() {
-  document.getElementById('modalOverlay').classList.add('hidden');
-  editandoId = null;
-}
-
-async function salvarParcelamento() {
-  const erroEl = document.getElementById('erroModal');
-  erroEl.classList.add('hidden');
-  const descricao      = document.getElementById('parDescricao').value.trim();
-  const valor_total    = parseFloat(document.getElementById('parValorTotal').value);
-  const total_parcelas = parseInt(document.getElementById('parTotalParcelas').value);
-  const valor_parcela  = parseFloat(document.getElementById('parValorParcela').value);
-  const categoria      = document.getElementById('parCategoria').value;
-  const mes_inicio     = parseInt(document.getElementById('parMesInicio').value);
-  const ano_inicio     = parseInt(document.getElementById('parAnoInicio').value);
-  if (!descricao || isNaN(valor_parcela) || isNaN(total_parcelas)) {
-    erroEl.textContent = 'Preencha todos os campos.';
-    erroEl.classList.remove('hidden'); return;
-  }
-  const corpo = {
-    descricao,
-    valor_total: isNaN(valor_total) ? valor_parcela * total_parcelas : valor_total,
-    valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria
+function situacaoBadge(sit) {
+  const mapa = {
+    admin:       '<span class="badge" style="background:#fef9c3;color:#854d0e">Admin</span>',
+    ativa:       '<span class="badge" style="background:var(--green-lt);color:var(--green)">✅ Ativa</span>',
+    expirando:   '<span class="badge" style="background:#fef3c7;color:var(--amber)">⚠️ Expirando</span>',
+    expirada:    '<span class="badge" style="background:var(--red-lt);color:var(--red)">❌ Expirada</span>',
+    sem_licenca: '<span class="badge" style="background:#f1f5f9;color:var(--text-muted)">⭕ Sem licença</span>',
+    bloqueado:   '<span class="badge" style="background:#fce7f3;color:#be185d">🚫 Bloqueado</span>'
   };
-  const resp = editandoId
-    ? await apiPut(`/parcelamentos/${editandoId}`, corpo)
-    : await apiPost('/parcelamentos', corpo);
+  return mapa[sit] || sit;
+}
+
+// ── Modal Licença ─────────────────────────────────────────────────
+function abrirLicenca(uid, nome) {
+  _uidLicenca = uid;
+  document.getElementById('licNome').textContent = nome;
+  document.getElementById('erroLicenca').classList.add('hidden');
+  document.getElementById('inputDias').value = '';
+  document.getElementById('inputData').value = '';
+  // Preenche data com licença atual do usuário
+  const u = _usuarios.find(x => x.id === uid);
+  if (u?.licenca_ate) {
+    document.getElementById('inputData').value = u.licenca_ate.split('T')[0];
+  }
+  document.getElementById('modalLicenca').classList.remove('hidden');
+}
+function fecharModalLicenca() {
+  document.getElementById('modalLicenca').classList.add('hidden');
+  _uidLicenca = null;
+}
+function trocarTabLic(tab, btn) {
+  _tabLicenca = tab;
+  document.getElementById('tabDias').style.display = tab === 'dias' ? '' : 'none';
+  document.getElementById('tabData').style.display = tab === 'data' ? '' : 'none';
+  document.querySelectorAll('.admin-lic-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function setDias(n) {
+  document.getElementById('inputDias').value = n;
+}
+async function salvarLicenca() {
+  if (!_uidLicenca) return;
+  const erroEl = document.getElementById('erroLicenca');
+  erroEl.classList.add('hidden');
+
+  let body;
+  if (_tabLicenca === 'dias') {
+    const dias = parseInt(document.getElementById('inputDias').value);
+    if (!dias || dias < 1) {
+      erroEl.textContent = 'Informe o número de dias (mínimo 1).';
+      erroEl.classList.remove('hidden'); return;
+    }
+    body = { dias };
+  } else {
+    const data = document.getElementById('inputData').value;
+    if (!data) {
+      erroEl.textContent = 'Selecione uma data.'; erroEl.classList.remove('hidden'); return;
+    }
+    body = { licenca_ate: data };
+  }
+
+  const resp = await apiPut(`/admin/usuarios/${_uidLicenca}/licenca`, body);
   if (!resp || !resp.ok) {
-    erroEl.textContent = resp?.data?.erro || 'Erro ao salvar.';
+    erroEl.textContent = resp?.data?.erro || 'Erro ao salvar licença.';
     erroEl.classList.remove('hidden'); return;
   }
-  fecharModal();
-  carregarParcelamentos();
+  fecharModalLicenca();
+  carregarUsuarios();
+}
+async function removerLicenca() {
+  if (!_uidLicenca) return;
+  const resp = await apiPut(`/admin/usuarios/${_uidLicenca}/licenca`, { licenca_ate: null });
+  if (resp?.ok) { fecharModalLicenca(); carregarUsuarios(); }
+}
+
+// ── Modal Confirmação ─────────────────────────────────────────────
+function confirmarAcao(uid, acao, nome) {
+  _uidConfirm  = uid;
+  _acaoConfirm = acao;
+  const msgs = {
+    bloquear:    [`🔒 Bloquear usuário`,    `O usuário <strong>${nome}</strong> perderá o acesso imediatamente.`],
+    desbloquear: [`🔓 Desbloquear usuário`, `O usuário <strong>${nome}</strong> poderá acessar novamente.`],
+    excluir:     [`🗑️ Excluir usuário`,     `Todos os dados de <strong>${nome}</strong> serão apagados permanentemente. Essa ação não pode ser desfeita.`]
+  };
+  const [titulo, msg] = msgs[acao] || ['Confirmar', 'Deseja continuar?'];
+  document.getElementById('confirmTitulo').textContent = titulo;
+  document.getElementById('confirmMsg').innerHTML      = msg;
+  document.getElementById('btnConfirm').className = acao === 'excluir'
+    ? 'btn-primario btn-danger'
+    : 'btn-primario';
+  document.getElementById('modalConfirm').classList.remove('hidden');
+}
+function fecharConfirm() {
+  document.getElementById('modalConfirm').classList.add('hidden');
+  _uidConfirm = null; _acaoConfirm = null;
+}
+async function executarConfirm() {
+  if (!_uidConfirm || !_acaoConfirm) return;
+  let resp;
+  if (_acaoConfirm === 'bloquear') {
+    resp = await apiPut(`/admin/usuarios/${_uidConfirm}/bloquear`, { bloqueado: true });
+  } else if (_acaoConfirm === 'desbloquear') {
+    resp = await apiPut(`/admin/usuarios/${_uidConfirm}/bloquear`, { bloqueado: false });
+  } else if (_acaoConfirm === 'excluir') {
+    resp = await apiDelete(`/admin/usuarios/${_uidConfirm}`);
+  }
+  fecharConfirm();
+  if (resp?.ok) carregarUsuarios();
+}
+
+// ── Sidebar mobile admin (simplificada) ──────────────────────────
+function toggleMenuAdmin() {
+  document.getElementById('sidebar').classList.toggle('aberta');
+  document.getElementById('overlay').classList.toggle('ativo');
+}
+function fecharMenuAdmin() {
+  document.getElementById('sidebar').classList.remove('aberta');
+  document.getElementById('overlay').classList.remove('ativo');
+}
+function sairAdmin() {
+  localStorage.removeItem('fp_token');
+  localStorage.removeItem('fp_usuario');
+  window.location.href = '/';
 }
