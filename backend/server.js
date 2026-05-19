@@ -1,66 +1,66 @@
-require('dotenv').config();
-const express = require('express');
-const cors    = require('cors');
-const path    = require('path');
-const cron    = require('node-cron');
-const { initDB, pool } = require('./db');
+const jwt  = require('jsonwebtoken');
+const { pool } = require('./db');
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
+// ── Middleware padrão: autentica + verifica bloqueio e licença ────
+async function autenticar(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-app.use(cors());
-app.use(express.json({ limit: '2mb' })); // base64 de foto pode ser grande
+  if (!token)
+    return res.status(401).json({ erro: 'Token não fornecido. Faça login.' });
 
-// Uploads (caso ainda haja arquivos legados)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-// Frontend estático
-app.use(express.static(path.join(__dirname, '../frontend')));
-
-// ── Rotas da API ─────────────────────────────────────────────────
-app.use('/api/auth',           require('./routes/auth'));
-app.use('/api/admin',          require('./routes/admin'));
-app.use('/api/receitas',       require('./routes/receitas'));
-app.use('/api/despesas',       require('./routes/despesas'));
-app.use('/api/parcelamentos',  require('./routes/parcelamentos'));
-app.use('/api/dashboard',      require('./routes/dashboard'));
-app.use('/api/previsao',       require('./routes/previsao'));
-app.use('/api/configuracoes',  require('./routes/configuracoes'));
-
-// Fallback SPA
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/index.html'));
-});
-
-// ── Backup automático 12h ─────────────────────────────────────────
-async function executarBackup() {
-  const client = await pool.connect();
+  let payload;
   try {
-    const usuarios = await client.query('SELECT id FROM usuarios');
-    for (const u of usuarios.rows) {
-      const uid = u.id;
-      const [r1, r2, r3, r4] = await Promise.all([
-        client.query('SELECT COUNT(*) FROM receitas       WHERE usuario_id=$1', [uid]),
-        client.query('SELECT COUNT(*) FROM despesas       WHERE usuario_id=$1', [uid]),
-        client.query('SELECT COUNT(*) FROM parcelamentos  WHERE usuario_id=$1', [uid]),
-        client.query('SELECT COUNT(*) FROM receitas_parceladas WHERE usuario_id=$1', [uid])
-      ]);
-      await client.query(
-        `INSERT INTO backup_log (usuario_id, status, detalhes) VALUES ($1, 'sucesso', $2)`,
-        [uid, JSON.stringify({
-          backup_em: new Date().toISOString(),
-          receitas: r1.rows[0].count, despesas: r2.rows[0].count,
-          parcelamentos: r3.rows[0].count, rec_parceladas: r4.rows[0].count
-        })]
-      );
+    payload = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return res.status(403).json({ erro: 'Token inválido ou expirado. Faça login novamente.' });
+  }
+
+  // Consulta estado atualizado do usuário no banco
+  // (não confia apenas no token — o admin pode ter bloqueado após o login)
+  try {
+    const r = await pool.query(
+      'SELECT id, nome, email, foto_url, perfil, licenca_ate, bloqueado FROM usuarios WHERE id=$1',
+      [payload.id]
+    );
+    if (!r.rows.length)
+      return res.status(401).json({ erro: 'Usuário não encontrado.' });
+
+    const u = r.rows[0];
+
+    // Verifica bloqueio
+    if (u.bloqueado)
+      return res.status(403).json({ erro: 'Conta bloqueada. Entre em contato com o administrador.', codigo: 'BLOQUEADO' });
+
+    // Verifica licença (admin não tem restrição de licença)
+    if (u.perfil !== 'admin' && u.licenca_ate) {
+      const hoje       = new Date();
+      const expiracao  = new Date(u.licenca_ate);
+      expiracao.setHours(23, 59, 59, 999); // fim do dia
+      if (hoje > expiracao)
+        return res.status(403).json({
+          erro:         'Licença expirada. Entre em contato com o administrador.',
+          codigo:       'LICENCA_EXPIRADA',
+          licenca_ate:  u.licenca_ate
+        });
     }
-    console.log(`✅ Backup em ${new Date().toLocaleString('pt-BR')}`);
+
+    req.usuario = u;
+    next();
   } catch (err) {
-    console.error('❌ Erro no backup:', err.message);
-  } finally { client.release(); }
+    console.error('Erro no middleware autenticar:', err);
+    return res.status(500).json({ erro: 'Erro interno de autenticação.' });
+  }
 }
 
-initDB().then(() => {
-  app.listen(PORT, () => console.log(`🚀 FinPessoal na porta ${PORT}`));
-  cron.schedule('0 */12 * * *', executarBackup);
-  setTimeout(executarBackup, 5000);
-}).catch(err => { console.error(err); process.exit(1); });
+// ── Middleware admin: exige perfil='admin' ────────────────────────
+async function autenticarAdmin(req, res, next) {
+  // Roda o autenticar normal primeiro
+  autenticar(req, res, () => {
+    if (req.usuario?.perfil !== 'admin')
+      return res.status(403).json({ erro: 'Acesso restrito ao administrador.' });
+    next();
+  });
+}
+
+module.exports = { autenticar, autenticarAdmin };
