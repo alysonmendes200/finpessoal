@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinPessoal – Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-brand"><div class="fp-logo">FP</div><span>FinPessoal</span></div>
+    <div class="sidebar-user" id="sidebarUser"></div>
+    <div class="sidebar-mes" id="sidebarMesSel"></div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"     class="nav-item active">📊 Dashboard</a>
+      <a href="receitas.html"      class="nav-item">💰 Receitas</a>
+      <a href="despesas.html"      class="nav-item">💳 Despesas</a>
+      <a href="parcelamentos.html" class="nav-item">📅 Parcelamentos</a>
+      <a href="previsao.html"      class="nav-item">🔮 Previsões</a>
+      <a href="configuracoes.html" class="nav-item">⚙️ Configurações e Perfil</a>
+    </nav>
+    <button class="btn-sair" onclick="sair()">🚪 Sair</button>
+  </div>
+  <div class="overlay" id="overlay" onclick="fecharMenu()"></div>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+      <div class="topbar-info">
+        <span id="saudacao">Olá!</span>
+        <div class="mes-selector topbar-mes-desktop">
+          <select id="selMes" onchange="onTopbarMesChange(carregarDados)"></select>
+          <select id="selAno" onchange="onTopbarMesChange(carregarDados)"></select>
+        </div>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <h1 class="page-title">Dashboard</h1>
+      <div class="cards-grid">
+        <div class="card card-receita">
+          <div class="card-label">Total Receitas</div>
+          <div class="card-valor" id="totalReceitas">R$ 0,00</div>
+          <div class="card-icon">💰</div>
+        </div>
+        <div class="card card-despesa">
+          <div class="card-label">Total Gastos</div>
+          <div class="card-valor" id="totalGastos">R$ 0,00</div>
+          <div class="card-icon">💸</div>
+        </div>
+        <div class="card card-parcela">
+          <div class="card-label">Parcelas do Mês</div>
+          <div class="card-valor" id="totalParcelas">R$ 0,00</div>
+          <div class="card-icon">📅</div>
+        </div>
+        <div class="card card-saldo" id="cardSaldo">
+          <div class="card-label">Saldo</div>
+          <div class="card-valor" id="saldo">R$ 0,00</div>
+          <div class="card-icon">⚖️</div>
+        </div>
+      </div>
+      <div class="card-diagnostico" id="cardDiagnostico"></div>
+      <div class="graficos-grid">
+        <div class="grafico-box">
+          <h3>Onde está indo seu dinheiro</h3>
+          <div class="grafico-wrapper"><canvas id="graficoCategorias"></canvas></div>
+          <div id="legendaCategorias" class="legenda-custom"></div>
+        </div>
+        <div class="grafico-box">
+          <h3>Receitas vs Gastos – <span id="anoGrafico"></span></h3>
+          <div class="grafico-wrapper"><canvas id="graficoAnual"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/app.js"></script>
+  <script src="../js/dashboard.js"></script>
+</body>
+</html>
