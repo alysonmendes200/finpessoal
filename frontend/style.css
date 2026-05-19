@@ -1,120 +1,150 @@
-// ===== FINPESSOAL – DASHBOARD JS v4 =====
+// ===== FINPESSOAL – PARCELAMENTOS JS v5 =====
 
-let graficoCat   = null;
-let graficoAnual = null;
+let todosParcelamentos = [];
+let editandoId         = null;
 
-const CORES_CAT = [
-  '#2563eb','#0891b2','#059669','#d97706','#7c3aed',
-  '#db2777','#0284c7','#16a34a','#ea580c','#9333ea','#0f766e','#b45309'
-];
+document.addEventListener('DOMContentLoaded', async () => {
+  await carregarConfiguracoes();
+  renderizarSidebarMesSel(null);
+  await popularSelectsParcelamentos();
+  await carregarParcelamentos();
+});
 
-// ── Carrega dados do mês/ano vindos do estado global ──────────────
-async function carregarDados() {
-  const mes = getMesGlobal();
-  const ano = getAnoGlobal();
-
-  const resp = await apiGet(`/dashboard/resumo?mes=${mes}&ano=${ano}`);
-  if (!resp || !resp.ok) return;
-
-  const d = resp.data;
-  document.getElementById('anoGrafico').textContent = ano;
-
-  document.getElementById('totalReceitas').textContent = formatarMoeda(d.totalReceitas);
-  document.getElementById('totalGastos').textContent   = formatarMoeda(d.totalGastos);
-  document.getElementById('totalParcelas').textContent = formatarMoeda(d.totalParcelas);
-
-  const saldoEl   = document.getElementById('saldo');
-  const cardSaldo = document.getElementById('cardSaldo');
-  saldoEl.textContent = formatarMoeda(d.saldo);
-  cardSaldo.classList.toggle('negativo', d.saldo < 0);
-
-  renderDiagnostico('cardDiagnostico', d.totalReceitas, d.totalGastos, d.saldo);
-  renderGraficoCategorias(d.categorias);
-  renderGraficoAnual(d.evolucaoMensal);
+async function popularSelectsParcelamentos() {
+  const cats = _catsDespesas.length ? _catsDespesas : await buscarCatsDespesas();
+  const sel  = document.getElementById('parCategoria');
+  if (sel) sel.innerHTML = cats.length
+    ? cats.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('')
+    : '<option>Sem categorias</option>';
+}
+async function buscarCatsDespesas() {
+  const r = await apiGet('/configuracoes/categorias-despesas');
+  return r?.ok ? r.data : [];
 }
 
-// ── Gráfico de categorias (rosca) ─────────────────────────────────
-function renderGraficoCategorias(categorias) {
-  const ctx = document.getElementById('graficoCategorias').getContext('2d');
-  if (graficoCat) graficoCat.destroy();
+async function carregarParcelamentos() {
+  const resp = await apiGet('/parcelamentos');
+  if (!resp || !resp.ok) return;
+  todosParcelamentos = resp.data;
+  renderParcelamentos(todosParcelamentos);
+  const total = todosParcelamentos.reduce((s, p) => s + parseFloat(p.valor_parcela), 0);
+  const el = document.getElementById('totalParcelas');
+  if (el) el.textContent = formatarMoeda(total);
+}
 
-  if (!categorias || categorias.length === 0) {
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    document.getElementById('legendaCategorias').innerHTML =
-      '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px 0">Sem gastos lançados neste mês</p>';
+function renderParcelamentos(lista) {
+  const el = document.getElementById('listaParcelamentos');
+  if (!lista || !lista.length) {
+    el.innerHTML = '<p class="lista-vazia">Nenhum parcelamento ativo.</p>';
     return;
   }
-
-  const labels = categorias.map(c => c.categoria);
-  const valores = categorias.map(c => parseFloat(c.total));
-  const cores   = categorias.map((_, i) => CORES_CAT[i % CORES_CAT.length]);
-
-  graficoCat = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels,
-      datasets: [{ data: valores, backgroundColor: cores, borderColor: '#fff', borderWidth: 3, hoverBorderWidth: 4 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${formatarMoeda(ctx.raw)}` } }
-      },
-      cutout: '68%'
-    }
-  });
-
-  document.getElementById('legendaCategorias').innerHTML = categorias.map((c, i) => `
-    <div class="legenda-item">
-      <div class="legenda-cor" style="background:${CORES_CAT[i % CORES_CAT.length]}"></div>
-      <span class="legenda-nome">${c.categoria}</span>
-      <span class="legenda-valor">${formatarMoeda(c.total)}</span>
-    </div>`).join('');
+  el.innerHTML = lista.map(p => {
+    const pct       = Math.min(((p.parcela_atual - 1) / p.total_parcelas) * 100, 100);
+    const restantes = p.total_parcelas - p.parcela_atual + 1;
+    return `
+    <div class="item-card">
+      <div class="item-emoji">${emojiCat(p.categoria)}</div>
+      <div class="item-info">
+        <div class="item-desc">${p.descricao}</div>
+        <div class="item-sub">
+          Parcela ${p.parcela_atual}/${p.total_parcelas}
+          · ${restantes} restante${restantes !== 1 ? 's' : ''}
+          · Saldo: ${formatarMoeda(p.valor_restante)}
+        </div>
+        <div class="parcela-progresso"><div class="parcela-fill" style="width:${pct.toFixed(1)}%"></div></div>
+      </div>
+      <div class="item-valor item-valor-parc">
+        ${formatarMoeda(p.valor_parcela)}<span class="item-unidade">/mês</span>
+      </div>
+      <div class="item-acoes">
+        <button class="btn-acao success" onclick="avancarParcela(${p.id})"      title="Paga">✅</button>
+        <button class="btn-acao"         onclick="abrirEdicao(${p.id})"         title="Editar">✏️</button>
+        <button class="btn-acao danger"  onclick="deletarParcelamento(${p.id})" title="Excluir">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-// ── Gráfico anual (barras) ────────────────────────────────────────
-function renderGraficoAnual(evolucao) {
-  const ctx = document.getElementById('graficoAnual').getContext('2d');
-  if (graficoAnual) graficoAnual.destroy();
-
-  const labels   = MESES.map(m => m.substring(0, 3));
-  const receitas = evolucao.map(e => parseFloat(e.receitas));
-  const despesas = evolucao.map(e => parseFloat(e.despesas));
-
-  graficoAnual = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Receitas', data: receitas, backgroundColor: 'rgba(37,99,235,0.75)', borderRadius: 6, borderSkipped: false },
-        { label: 'Gastos',   data: despesas, backgroundColor: 'rgba(220,38,38,0.60)', borderRadius: 6, borderSkipped: false }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: '#64748b', font: { size: 12, family: 'Inter' } } },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${formatarMoeda(ctx.raw)}` } }
-      },
-      scales: {
-        x: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { color: '#f1f5f9' } },
-        y: {
-          ticks: { color: '#94a3b8', font: { size: 11 }, callback: v => 'R$ ' + (v / 1000).toFixed(0) + 'k' },
-          grid: { color: '#f1f5f9' }
-        }
-      }
-    }
-  });
+async function avancarParcela(id) {
+  if (!confirm('Marcar parcela atual como paga e avançar?')) return;
+  const resp = await apiPatch(`/parcelamentos/${id}/avancar`, {});
+  if (resp?.ok) carregarParcelamentos();
+  else alert(resp?.data?.erro || 'Erro.');
+}
+async function deletarParcelamento(id) {
+  if (!confirm('Remover este parcelamento?')) return;
+  const resp = await apiDelete(`/parcelamentos/${id}`);
+  if (resp?.ok) carregarParcelamentos();
 }
 
-// ── Init ──────────────────────────────────────────────────────────
-// app.js DOMContentLoaded já chama verificarAuth, exibirSaudacao,
-// renderizarSidebarUser e preencherFiltros (selects do topbar desktop).
-// Aqui registramos o seletor mobile na sidebar e carregamos os dados.
-document.addEventListener('DOMContentLoaded', () => {
-  // Injeta seletor de mês na sidebar (visível somente no mobile via CSS)
-  renderizarSidebarMesSel(carregarDados);
-  // Carrega dados com o mês do estado global (sessionStorage ou data atual)
-  setTimeout(carregarDados, 150);
-});
+function calcularParcela() {
+  const t = parseFloat(document.getElementById('parValorTotal').value);
+  const n = parseInt(document.getElementById('parTotalParcelas').value);
+  if (t > 0 && n > 0) document.getElementById('parValorParcela').value = (t / n).toFixed(2);
+}
+
+function abrirModal() {
+  editandoId = null;
+  document.getElementById('modalTitulo').textContent = 'Novo Parcelamento';
+  document.getElementById('erroModal').classList.add('hidden');
+  ['parDescricao','parValorTotal','parTotalParcelas','parValorParcela'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const sel = document.getElementById('parCategoria');
+  if (sel?.options.length) sel.selectedIndex = 0;
+  const agora = new Date();
+  preencherMesAno('parMesInicio', 'parAnoInicio', agora.getMonth() + 1, agora.getFullYear());
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function abrirEdicao(id) {
+  const p = todosParcelamentos.find(x => x.id === id);
+  if (!p) return;
+  editandoId = id;
+  document.getElementById('modalTitulo').textContent = 'Editar Parcelamento';
+  document.getElementById('erroModal').classList.add('hidden');
+  document.getElementById('parDescricao').value     = p.descricao;
+  document.getElementById('parValorTotal').value    = p.valor_total;
+  document.getElementById('parTotalParcelas').value = p.total_parcelas;
+  document.getElementById('parValorParcela').value  = p.valor_parcela;
+  const sel = document.getElementById('parCategoria');
+  if (sel) sel.value = p.categoria;
+  preencherMesAno('parMesInicio', 'parAnoInicio', p.mes_inicio, p.ano_inicio);
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function fecharModal() {
+  document.getElementById('modalOverlay').classList.add('hidden');
+  editandoId = null;
+}
+
+async function salvarParcelamento() {
+  const erroEl = document.getElementById('erroModal');
+  erroEl.classList.add('hidden');
+  const descricao      = document.getElementById('parDescricao').value.trim();
+  const valor_total    = parseFloat(document.getElementById('parValorTotal').value);
+  const total_parcelas = parseInt(document.getElementById('parTotalParcelas').value);
+  const valor_parcela  = parseFloat(document.getElementById('parValorParcela').value);
+  const categoria      = document.getElementById('parCategoria').value;
+  const mes_inicio     = parseInt(document.getElementById('parMesInicio').value);
+  const ano_inicio     = parseInt(document.getElementById('parAnoInicio').value);
+  if (!descricao || isNaN(valor_parcela) || isNaN(total_parcelas)) {
+    erroEl.textContent = 'Preencha todos os campos.';
+    erroEl.classList.remove('hidden'); return;
+  }
+  const corpo = {
+    descricao,
+    valor_total: isNaN(valor_total) ? valor_parcela * total_parcelas : valor_total,
+    valor_parcela, total_parcelas, mes_inicio, ano_inicio, categoria
+  };
+  const resp = editandoId
+    ? await apiPut(`/parcelamentos/${editandoId}`, corpo)
+    : await apiPost('/parcelamentos', corpo);
+  if (!resp || !resp.ok) {
+    erroEl.textContent = resp?.data?.erro || 'Erro ao salvar.';
+    erroEl.classList.remove('hidden'); return;
+  }
+  fecharModal();
+  carregarParcelamentos();
+}
